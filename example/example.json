@@ -1,0 +1,31 @@
+{
+	"type_enum": [
+		"one",
+		"two",
+		"four"
+	],
+	"nested_object": {
+		"a": "uint8",
+		"b": "string"
+	},
+	"test": [
+		{
+			"req_int8": "int8",
+			"req_uint16": "uint16",
+			"req_double": "double",
+			"req_bool": "bool",
+			"req_string": "string",
+			"?opt_int8": "int8",
+			"?opt_uint16": "uint16",
+			"?opt_double": "double",
+			"?opt_bool": "bool",
+			"?opt_string": "string",
+			"req_list": ["uint8"],
+			"?opt_list": ["uint8"],
+			"req_enum": "@type_enum",
+			"?opt_enum": "@type_enum",
+			"req_nested": "@nested_object",
+			"?opt_nested": "@nested_object"
+		}
+	]
+}
