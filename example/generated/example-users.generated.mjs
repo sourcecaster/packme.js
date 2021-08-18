@@ -775,3 +775,5 @@ const exampleUsersMessageFactory = {
 	'808423104': () => new DeleteRequest(),
 	'743336169': () => new UpdateSessionMessage(),
 };
+
+export {GetAllResponse, GetAllRequest, GetResponse, GetRequest, DeleteResponse, DeleteRequest, UpdateSessionMessage, exampleUsersMessageFactory};

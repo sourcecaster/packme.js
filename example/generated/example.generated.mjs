@@ -236,3 +236,5 @@ class TestMessage extends PackMeMessage {
 const exampleMessageFactory = {
 	'475203406': () => new TestMessage(),
 };
+
+export {TypeEnum, NestedObject, TestMessage, exampleMessageFactory};

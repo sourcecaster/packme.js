@@ -674,3 +674,5 @@ const examplePostsMessageFactory = {
 	'788388804': () => new DeleteResponse(),
 	'486637631': () => new DeleteRequest(),
 };
+
+export {GetAllResponse, GetAllRequest, GetResponse, GetRequest, DeleteResponse, DeleteRequest, examplePostsMessageFactory};
