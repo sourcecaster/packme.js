@@ -1,5 +1,4 @@
 ## v1.0.0
-
 * Enums and Types can be referenced from another manifest files.
 * Enum declaration implemented.
 * Type (nested object) declaration implemented.
