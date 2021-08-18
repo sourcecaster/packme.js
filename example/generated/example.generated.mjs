@@ -16,8 +16,10 @@ class NestedObject extends PackMeMessage {
 		/** !string */ b,
 	) {
 		super();
-		this.$check('a', a);
-		this.$check('b', b);
+		if (arguments.length > 0) {
+			this.$check('a', a);
+			this.$check('b', b);
+		}
 		this.a = a;
 		this.b = b;
 	}
@@ -85,14 +87,16 @@ class TestMessage extends PackMeMessage {
 		/** ?NestedObject */ optNested,
 	) {
 		super();
-		this.$check('reqInt8', reqInt8);
-		this.$check('reqUint16', reqUint16);
-		this.$check('reqDouble', reqDouble);
-		this.$check('reqBool', reqBool);
-		this.$check('reqString', reqString);
-		this.$check('reqList', reqList);
-		this.$check('reqEnum', reqEnum);
-		this.$check('reqNested', reqNested);
+		if (arguments.length > 0) {
+			this.$check('reqInt8', reqInt8);
+			this.$check('reqUint16', reqUint16);
+			this.$check('reqDouble', reqDouble);
+			this.$check('reqBool', reqBool);
+			this.$check('reqString', reqString);
+			this.$check('reqList', reqList);
+			this.$check('reqEnum', reqEnum);
+			this.$check('reqNested', reqNested);
+		}
 		this.reqInt8 = reqInt8;
 		this.reqUint16 = reqUint16;
 		this.reqDouble = reqDouble;

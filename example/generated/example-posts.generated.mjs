@@ -11,9 +11,11 @@ class GetAllResponsePostAuthor extends PackMeMessage {
 		/** !string */ avatar,
 	) {
 		super();
-		this.$check('id', id);
-		this.$check('nickname', nickname);
-		this.$check('avatar', avatar);
+		if (arguments.length > 0) {
+			this.$check('id', id);
+			this.$check('nickname', nickname);
+			this.$check('avatar', avatar);
+		}
 		this.id = id;
 		this.nickname = nickname;
 		this.avatar = avatar;
@@ -70,11 +72,13 @@ class GetAllResponsePost extends PackMeMessage {
 		/** !Date */ posted,
 	) {
 		super();
-		this.$check('id', id);
-		this.$check('author', author);
-		this.$check('title', title);
-		this.$check('shortContent', shortContent);
-		this.$check('posted', posted);
+		if (arguments.length > 0) {
+			this.$check('id', id);
+			this.$check('author', author);
+			this.$check('title', title);
+			this.$check('shortContent', shortContent);
+			this.$check('posted', posted);
+		}
 		this.id = id;
 		this.author = author;
 		this.title = title;
@@ -130,7 +134,9 @@ class GetAllResponse extends PackMeMessage {
 		/** !GetAllResponsePost[] */ posts,
 	) {
 		super();
-		this.$check('posts', posts);
+		if (arguments.length > 0) {
+			this.$check('posts', posts);
+		}
 		this.posts = posts;
 	}
 	
@@ -221,9 +227,11 @@ class GetResponseAuthor extends PackMeMessage {
 		/** ?string */ instagramId,
 	) {
 		super();
-		this.$check('id', id);
-		this.$check('nickname', nickname);
-		this.$check('avatar', avatar);
+		if (arguments.length > 0) {
+			this.$check('id', id);
+			this.$check('nickname', nickname);
+			this.$check('avatar', avatar);
+		}
 		this.id = id;
 		this.nickname = nickname;
 		this.avatar = avatar;
@@ -303,8 +311,10 @@ class GetResponseStats extends PackMeMessage {
 		/** !number */ dislikes,
 	) {
 		super();
-		this.$check('likes', likes);
-		this.$check('dislikes', dislikes);
+		if (arguments.length > 0) {
+			this.$check('likes', likes);
+			this.$check('dislikes', dislikes);
+		}
 		this.likes = likes;
 		this.dislikes = dislikes;
 	}
@@ -345,9 +355,11 @@ class GetResponseCommentAuthor extends PackMeMessage {
 		/** !string */ avatar,
 	) {
 		super();
-		this.$check('id', id);
-		this.$check('nickname', nickname);
-		this.$check('avatar', avatar);
+		if (arguments.length > 0) {
+			this.$check('id', id);
+			this.$check('nickname', nickname);
+			this.$check('avatar', avatar);
+		}
 		this.id = id;
 		this.nickname = nickname;
 		this.avatar = avatar;
@@ -400,9 +412,11 @@ class GetResponseComment extends PackMeMessage {
 		/** !Date */ posted,
 	) {
 		super();
-		this.$check('author', author);
-		this.$check('comment', comment);
-		this.$check('posted', posted);
+		if (arguments.length > 0) {
+			this.$check('author', author);
+			this.$check('comment', comment);
+			this.$check('posted', posted);
+		}
 		this.author = author;
 		this.comment = comment;
 		this.posted = posted;
@@ -454,12 +468,14 @@ class GetResponse extends PackMeMessage {
 		/** !GetResponseComment[] */ comments,
 	) {
 		super();
-		this.$check('title', title);
-		this.$check('content', content);
-		this.$check('posted', posted);
-		this.$check('author', author);
-		this.$check('stats', stats);
-		this.$check('comments', comments);
+		if (arguments.length > 0) {
+			this.$check('title', title);
+			this.$check('content', content);
+			this.$check('posted', posted);
+			this.$check('author', author);
+			this.$check('stats', stats);
+			this.$check('comments', comments);
+		}
 		this.title = title;
 		this.content = content;
 		this.posted = posted;
@@ -521,7 +537,9 @@ class GetRequest extends PackMeMessage {
 		/** !number[] */ postId,
 	) {
 		super();
-		this.$check('postId', postId);
+		if (arguments.length > 0) {
+			this.$check('postId', postId);
+		}
 		this.postId = postId;
 	}
 	
@@ -578,6 +596,8 @@ class DeleteResponse extends PackMeMessage {
 		/** ?string */ error,
 	) {
 		super();
+		if (arguments.length > 0) {
+		}
 		this.error = error;
 	}
 	
@@ -621,7 +641,9 @@ class DeleteRequest extends PackMeMessage {
 		/** !number[] */ postId,
 	) {
 		super();
-		this.$check('postId', postId);
+		if (arguments.length > 0) {
+			this.$check('postId', postId);
+		}
 		this.postId = postId;
 	}
 	

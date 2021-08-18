@@ -15,8 +15,10 @@ class GetAllResponseUser extends PackMeMessage {
 		/** ?number */ age,
 	) {
 		super();
-		this.$check('id', id);
-		this.$check('nickname', nickname);
+		if (arguments.length > 0) {
+			this.$check('id', id);
+			this.$check('nickname', nickname);
+		}
 		this.id = id;
 		this.nickname = nickname;
 		this.firstName = firstName;
@@ -90,7 +92,9 @@ class GetAllResponse extends PackMeMessage {
 		/** !GetAllResponseUser[] */ users,
 	) {
 		super();
-		this.$check('users', users);
+		if (arguments.length > 0) {
+			this.$check('users', users);
+		}
 		this.users = users;
 	}
 	
@@ -179,6 +183,8 @@ class GetResponseInfo extends PackMeMessage {
 		/** ?Date */ birthDate,
 	) {
 		super();
+		if (arguments.length > 0) {
+		}
 		this.firstName = firstName;
 		this.lastName = lastName;
 		this.male = male;
@@ -260,6 +266,8 @@ class GetResponseSocial extends PackMeMessage {
 		/** ?string */ instagramId,
 	) {
 		super();
+		if (arguments.length > 0) {
+		}
 		this.facebookId = facebookId;
 		this.twitterId = twitterId;
 		this.instagramId = instagramId;
@@ -327,11 +335,13 @@ class GetResponseStats extends PackMeMessage {
 		/** !number */ rating,
 	) {
 		super();
-		this.$check('posts', posts);
-		this.$check('comments', comments);
-		this.$check('likes', likes);
-		this.$check('dislikes', dislikes);
-		this.$check('rating', rating);
+		if (arguments.length > 0) {
+			this.$check('posts', posts);
+			this.$check('comments', comments);
+			this.$check('likes', likes);
+			this.$check('dislikes', dislikes);
+			this.$check('rating', rating);
+		}
 		this.posts = posts;
 		this.comments = comments;
 		this.likes = likes;
@@ -379,8 +389,10 @@ class GetResponseLastActive extends PackMeMessage {
 		/** !string */ ip,
 	) {
 		super();
-		this.$check('datetime', datetime);
-		this.$check('ip', ip);
+		if (arguments.length > 0) {
+			this.$check('datetime', datetime);
+			this.$check('ip', ip);
+		}
 		this.datetime = datetime;
 		this.ip = ip;
 	}
@@ -422,9 +434,11 @@ class GetResponseSession extends PackMeMessage {
 		/** !boolean */ active,
 	) {
 		super();
-		this.$check('created', created);
-		this.$check('ip', ip);
-		this.$check('active', active);
+		if (arguments.length > 0) {
+			this.$check('created', created);
+			this.$check('ip', ip);
+			this.$check('active', active);
+		}
 		this.created = created;
 		this.ip = ip;
 		this.active = active;
@@ -481,14 +495,16 @@ class GetResponse extends PackMeMessage {
 		/** !GetResponseSession[] */ sessions,
 	) {
 		super();
-		this.$check('email', email);
-		this.$check('nickname', nickname);
-		this.$check('hidden', hidden);
-		this.$check('created', created);
-		this.$check('info', info);
-		this.$check('social', social);
-		this.$check('stats', stats);
-		this.$check('sessions', sessions);
+		if (arguments.length > 0) {
+			this.$check('email', email);
+			this.$check('nickname', nickname);
+			this.$check('hidden', hidden);
+			this.$check('created', created);
+			this.$check('info', info);
+			this.$check('social', social);
+			this.$check('stats', stats);
+			this.$check('sessions', sessions);
+		}
 		this.email = email;
 		this.nickname = nickname;
 		this.hidden = hidden;
@@ -568,7 +584,9 @@ class GetRequest extends PackMeMessage {
 		/** !number[] */ userId,
 	) {
 		super();
-		this.$check('userId', userId);
+		if (arguments.length > 0) {
+			this.$check('userId', userId);
+		}
 		this.userId = userId;
 	}
 	
@@ -628,6 +646,8 @@ class DeleteResponse extends PackMeMessage {
 		/** ?string */ error,
 	) {
 		super();
+		if (arguments.length > 0) {
+		}
 		this.error = error;
 	}
 	
@@ -671,7 +691,9 @@ class DeleteRequest extends PackMeMessage {
 		/** !number[] */ userId,
 	) {
 		super();
-		this.$check('userId', userId);
+		if (arguments.length > 0) {
+			this.$check('userId', userId);
+		}
 		this.userId = userId;
 	}
 	
@@ -725,8 +747,10 @@ class UpdateSessionMessage extends PackMeMessage {
 		/** !string */ sessionId,
 	) {
 		super();
-		this.$check('userId', userId);
-		this.$check('sessionId', sessionId);
+		if (arguments.length > 0) {
+			this.$check('userId', userId);
+			this.$check('sessionId', sessionId);
+		}
 		this.userId = userId;
 		this.sessionId = sessionId;
 	}
