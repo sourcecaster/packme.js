@@ -115,9 +115,9 @@ class GetUsersRequest extends PackMeMessage {
 	}
 	
 	/** @return {GetUsersResponse} */
-	$response({
-			/** !GetUsersResponseUser[] */ users,
-	}) {
+	$response(
+		/** !GetUsersResponseUser[] */ users,
+	) {
 		let message = new GetUsersResponse(users);
 		message.$request = this;
 		return message;
@@ -306,12 +306,12 @@ class GetUserRequest extends PackMeMessage {
 	}
 	
 	/** @return {GetUserResponse} */
-	$response({
-			/** !UserProfile */ profile,
-			/** !Date */ created,
-			/** !UserSession[] */ sessions,
-			/** ?GetUserResponseSocial */ social,
-	}) {
+	$response(
+		/** !UserProfile */ profile,
+		/** !Date */ created,
+		/** !UserSession[] */ sessions,
+		/** ?GetUserResponseSocial */ social,
+	) {
 		let message = new GetUserResponse(profile, created, sessions, social);
 		message.$request = this;
 		return message;
@@ -408,9 +408,9 @@ class DeleteUserRequest extends PackMeMessage {
 	}
 	
 	/** @return {DeleteUserResponse} */
-	$response({
-			/** ?string */ error,
-	}) {
+	$response(
+		/** ?string */ error,
+	) {
 		let message = new DeleteUserResponse(error);
 		message.$request = this;
 		return message;
