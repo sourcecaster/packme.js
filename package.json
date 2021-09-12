@@ -1,6 +1,9 @@
 {
-  "name": "packme.js",
+  "name": "packme",
   "version": "1.0.0",
+  "description": "Simple and extremely fast binary serialization using classes generated from JSON manifest files.",
+  "main": "lib/packme.mjs",
+  "module": "lib/packme.mjs",
   "private": true,
   "scripts": {
     "build": "rollup -c",
@@ -10,7 +13,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^17.1.0",
     "rollup": "^2.55.1",
     "rollup-plugin-terser": "^7.0.2"
   },

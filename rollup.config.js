@@ -1,4 +1,3 @@
-import commonjs from '@rollup/plugin-commonjs';
 import { terser } from 'rollup-plugin-terser';
 
 const production = !process.env.ROLLUP_WATCH;
@@ -13,7 +12,6 @@ export default [
 			file: 'build/packme.min.js'
 		},
 		plugins: [
-			commonjs(),
 			production && terser()
 		],
 		watch: {
@@ -29,7 +27,6 @@ export default [
 			file: 'build/compile.min.js'
 		},
 		plugins: [
-			commonjs(),
 			production && terser()
 		],
 		watch: {
