@@ -1,13 +1,14 @@
 {
   "name": "packme",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simple and extremely fast binary serialization using classes generated from JSON manifest files.",
   "main": "lib/packme.mjs",
   "module": "lib/packme.mjs",
-  "private": true,
   "scripts": {
     "build": "rollup -c",
-    "dev": "rollup -c -w"
+    "dev": "rollup -c -w",
+    "example": "node example/example.mjs",
+    "compile": "node lib/compiler.mjs example example/generated"
   },
   "keywords": [],
   "author": "",

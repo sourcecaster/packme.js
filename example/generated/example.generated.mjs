@@ -1,4 +1,4 @@
-import {PackMe, PackMeMessage} from 'packme';
+import {PackMe, PackMeMessage} from '../../lib/packme.mjs';
 
 /** @enum {number} */
 const TypeEnum = {
@@ -51,11 +51,15 @@ class NestedObject extends PackMeMessage {
 }
 
 class TestMessage extends PackMeMessage {
+	/** @type {!Uint8Array} */ reqId;
+	/** @type {!Uint8Array[]} */ reqIds;
 	/** @type {!number} */ reqInt8;
 	/** @type {!number} */ reqUint16;
 	/** @type {!number} */ reqDouble;
 	/** @type {!boolean} */ reqBool;
 	/** @type {!string} */ reqString;
+	/** @type {?Uint8Array} */ optId;
+	/** @type {?Uint8Array[]} */ optIds;
 	/** @type {?number} */ optInt8;
 	/** @type {?number} */ optUint16;
 	/** @type {?number} */ optDouble;
@@ -69,11 +73,15 @@ class TestMessage extends PackMeMessage {
 	/** @type {?NestedObject} */ optNested;
 	
 	constructor(
+		/** !Uint8Array */ reqId,
+		/** !Uint8Array[] */ reqIds,
 		/** !number */ reqInt8,
 		/** !number */ reqUint16,
 		/** !number */ reqDouble,
 		/** !boolean */ reqBool,
 		/** !string */ reqString,
+		/** ?Uint8Array */ optId,
+		/** ?Uint8Array[] */ optIds,
 		/** ?number */ optInt8,
 		/** ?number */ optUint16,
 		/** ?number */ optDouble,
@@ -88,6 +96,8 @@ class TestMessage extends PackMeMessage {
 	) {
 		super();
 		if (arguments.length > 0) {
+			this.$check('reqId', reqId);
+			this.$check('reqIds', reqIds);
 			this.$check('reqInt8', reqInt8);
 			this.$check('reqUint16', reqUint16);
 			this.$check('reqDouble', reqDouble);
@@ -97,11 +107,15 @@ class TestMessage extends PackMeMessage {
 			this.$check('reqEnum', reqEnum);
 			this.$check('reqNested', reqNested);
 		}
+		this.reqId = reqId;
+		this.reqIds = reqIds;
 		this.reqInt8 = reqInt8;
 		this.reqUint16 = reqUint16;
 		this.reqDouble = reqDouble;
 		this.reqBool = reqBool;
 		this.reqString = reqString;
+		this.optId = optId;
+		this.optIds = optIds;
 		this.optInt8 = optInt8;
 		this.optUint16 = optUint16;
 		this.optDouble = optDouble;
@@ -118,8 +132,19 @@ class TestMessage extends PackMeMessage {
 	/** @return {number} */
 	$estimate() {
 		this.$reset();
-		let bytes = 22;
+		let bytes = 35;
+		bytes += 4;
+		bytes += 4 * this.reqIds.length;
 		bytes += this.$stringBytes(this.reqString);
+		this.$setFlag(this.optId != null);
+		if (this.optId != null) {
+			bytes += 12;
+		}
+		this.$setFlag(this.optIds != null);
+		if (this.optIds != null) {
+			bytes += 4;
+			bytes += 4 * this.optIds.length;
+		}
 		this.$setFlag(this.optInt8 != null);
 		if (this.optInt8 != null) {
 			bytes += 1;
@@ -162,12 +187,20 @@ class TestMessage extends PackMeMessage {
 	/** @return {undefined} */
 	$pack() {
 		this.$initPack(475203406);
-		for (let i = 0; i < 1; i++) this.$packUint8(this.$flags[i]);
+		for (let i = 0; i < 2; i++) this.$packUint8(this.$flags[i]);
+		this.$packBinary(this.reqId, 12);
+		this.$packUint32(this.reqIds.length);
+		for (let item of this.reqIds) this.$packBinary(item, 4);
 		this.$packInt8(this.reqInt8);
 		this.$packUint16(this.reqUint16);
 		this.$packDouble(this.reqDouble);
 		this.$packBool(this.reqBool);
 		this.$packString(this.reqString);
+		if (this.optId != null) this.$packBinary(this.optId, 12);
+		if (this.optIds != null) {
+			this.$packUint32(this.optIds.length);
+			for (let item of this.optIds) this.$packBinary(item, 4);
+		}
 		if (this.optInt8 != null) this.$packInt8(this.optInt8);
 		if (this.optUint16 != null) this.$packUint16(this.optUint16);
 		if (this.optDouble != null) this.$packDouble(this.optDouble);
@@ -188,12 +221,28 @@ class TestMessage extends PackMeMessage {
 	/** @return {undefined} */
 	$unpack() {
 		this.$initUnpack();
-		for (let i = 0; i < 1; i++) this.$flags.push(this.$unpackUint8());
+		for (let i = 0; i < 2; i++) this.$flags.push(this.$unpackUint8());
+		this.reqId = this.$unpackBinary(12);
+		this.reqIds = [];
+		let reqIdsLength = this.$unpackUint32();
+		for (let i = 0; i < reqIdsLength; i++) {
+			this.reqIds.push(this.$unpackBinary(4));
+		}
 		this.reqInt8 = this.$unpackInt8();
 		this.reqUint16 = this.$unpackUint16();
 		this.reqDouble = this.$unpackDouble();
 		this.reqBool = this.$unpackBool();
 		this.reqString = this.$unpackString();
+		if (this.$getFlag()) {
+			this.optId = this.$unpackBinary(12);
+		}
+		if (this.$getFlag()) {
+			this.optIds = [];
+			let optIdsLength = this.$unpackUint32();
+			for (let i = 0; i < optIdsLength; i++) {
+				this.optIds.push(this.$unpackBinary(4));
+			}
+		}
 		if (this.$getFlag()) {
 			this.optInt8 = this.$unpackInt8();
 		}
@@ -233,7 +282,7 @@ class TestMessage extends PackMeMessage {
 
 	/** @return {string} */
 	toString() {
-		return `TestMessage\x1b[0m(reqInt8: ${PackMe.dye(this.reqInt8)}, reqUint16: ${PackMe.dye(this.reqUint16)}, reqDouble: ${PackMe.dye(this.reqDouble)}, reqBool: ${PackMe.dye(this.reqBool)}, reqString: ${PackMe.dye(this.reqString)}, optInt8: ${PackMe.dye(this.optInt8)}, optUint16: ${PackMe.dye(this.optUint16)}, optDouble: ${PackMe.dye(this.optDouble)}, optBool: ${PackMe.dye(this.optBool)}, optString: ${PackMe.dye(this.optString)}, reqList: ${PackMe.dye(this.reqList)}, optList: ${PackMe.dye(this.optList)}, reqEnum: ${PackMe.dye(this.reqEnum)}, optEnum: ${PackMe.dye(this.optEnum)}, reqNested: ${PackMe.dye(this.reqNested)}, optNested: ${PackMe.dye(this.optNested)})`;
+		return `TestMessage\x1b[0m(reqId: ${PackMe.dye(this.reqId)}, reqIds: ${PackMe.dye(this.reqIds)}, reqInt8: ${PackMe.dye(this.reqInt8)}, reqUint16: ${PackMe.dye(this.reqUint16)}, reqDouble: ${PackMe.dye(this.reqDouble)}, reqBool: ${PackMe.dye(this.reqBool)}, reqString: ${PackMe.dye(this.reqString)}, optId: ${PackMe.dye(this.optId)}, optIds: ${PackMe.dye(this.optIds)}, optInt8: ${PackMe.dye(this.optInt8)}, optUint16: ${PackMe.dye(this.optUint16)}, optDouble: ${PackMe.dye(this.optDouble)}, optBool: ${PackMe.dye(this.optBool)}, optString: ${PackMe.dye(this.optString)}, reqList: ${PackMe.dye(this.reqList)}, optList: ${PackMe.dye(this.optList)}, reqEnum: ${PackMe.dye(this.reqEnum)}, optEnum: ${PackMe.dye(this.optEnum)}, reqNested: ${PackMe.dye(this.reqNested)}, optNested: ${PackMe.dye(this.optNested)})`;
 	}
 }
 
