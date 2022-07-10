@@ -1,4 +1,4 @@
-import {PackMe, PackMeMessage} from '../../lib/packme.mjs';
+import {PackMe, PackMeMessage} from 'packme';
 
 /** @enum {number} */
 const TypeEnum = {
