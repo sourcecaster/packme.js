@@ -12,11 +12,11 @@ export default class StringField extends Field {
 	}
 
 	estimator(name = '') {
-		return `this.$stringBytes(${name})`;
+		return `this.$stringBytes(this.${name})`;
 	}
 
 	packer(name = '') {
-		return `this.$packString(${name})`;
+		return `this.$packString(this.${name})`;
 	}
 
 	unpacker() {

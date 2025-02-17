@@ -80,8 +80,40 @@
 
 import fs from 'fs';
 import path from 'path';
-import { GREEN, YELLOW, RED, RESET } from './utils.js';
+import { formatCode, GREEN, YELLOW, RED, RESET } from './utils.js';
 import Container from './container.js';
+
+import { nodes } from './node.js';
+import Enum from './nodes/enum.js';
+import Message from './nodes/message.js';
+import Obj from './nodes/object.js';
+import Request from './nodes/request.js';
+
+nodes.Enum = Enum;
+nodes.Message = Message;
+nodes.Obj = Obj;
+nodes.Request = Request;
+
+import ArrayField from './fields/array.js';
+import BinaryField from './fields/binary.js';
+import BoolField from './fields/bool.js';
+import DateTimeField from './fields/datetime.js';
+import FloatField from './fields/float.js';
+import IntField from './fields/int.js';
+import ObjectField from './fields/object.js';
+import ReferenceField from './fields/reference.js';
+import StringField from './fields/string.js';
+
+import { fields } from './field.js';
+fields.ArrayField = ArrayField;
+fields.BinaryField = BinaryField;
+fields.BoolField = BoolField;
+fields.DateTimeField = DateTimeField;
+fields.FloatField = FloatField;
+fields.IntField = IntField;
+fields.ObjectField = ObjectField;
+fields.ReferenceField = ReferenceField;
+fields.StringField = StringField;
 
 function processFiles(srcPath, outPath, filenames, isTest) {
 	let files;
@@ -107,7 +139,7 @@ function processFiles(srcPath, outPath, filenames, isTest) {
 	let containers = {};
 
 	for (let file of files) {
-		const filename = reName.exec(file)[1];
+		let filename = reName.exec(file)[1];
 
 		// Try to get the file contents as potential JSON string
 		let json;
@@ -129,6 +161,23 @@ function processFiles(srcPath, outPath, filenames, isTest) {
 		// Create container with nodes from the parsed data
 		containers[filename] = new Container(filename, manifest, containers);
 	}
+
+	let codePerFile = {};
+
+	// Process nodes and get resulting code strings
+	for (let container of Object.values(containers)) {
+		codePerFile[container.filename] ??= [];
+		codePerFile[container.filename].push(...container.output(containers));
+	}
+
+	// Output resulting code
+	for (let filename in codePerFile) {
+		let code = formatCode(codePerFile[filename]).join('\n');
+		if (!isTest) fs.writeFileSync(`${outPath}/${filename}.generated.js`, code, 'utf8');
+		else console.log(`${filename}.generated.js: ~${code.length} bytes`);
+	}
+
+	console.log(`${GREEN}${files.length} file${files.length > 1 ? 's are' : ' is'} successfully processed${RESET}`);
 }
 
 let args = process.argv.slice(2);

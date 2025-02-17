@@ -1,7 +1,7 @@
 // This class describes object field of object type { ... }.
 
 import Field from '../field.js';
-import Obj from './object.js';
+import Obj from '../nodes/object.js';
 import { toSingular } from '../utils.js';
 
 export default class ObjectField extends Field {
@@ -16,11 +16,11 @@ export default class ObjectField extends Field {
 	}
 
 	estimator(name = '') {
-		return `${name}.$estimate()`;
+		return `this.${name}.$estimate()`;
 	}
 
 	packer(name = '') {
-		return `this.$packMessage(${name})`;
+		return `this.$packMessage(this.${name})`;
 	}
 
 	unpacker() {

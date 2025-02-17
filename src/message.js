@@ -1,5 +1,5 @@
-const _utf8Encoder = new TextEncoder();
-const _utf8Decoder = new TextDecoder();
+let _utf8Encoder = new TextEncoder();
+let _utf8Decoder = new TextDecoder();
 
 class PackMeMessage {
 	static #globalTransactionId = 0;
@@ -19,9 +19,10 @@ class PackMeMessage {
 		this.#transactionId = request.#transactionId;
 	}
 
-	$check(name, value) {
+	$ensure(name, value) {
 		if (value === undefined) throw new Error(`Missing required parameter: ${name}`);
 		else if (value == null) throw new Error(`Parameter cannot be null: ${name}`);
+		return value;
 	}
 	$estimate() {
 		throw new Error('Method $estimate() is not implemented!');

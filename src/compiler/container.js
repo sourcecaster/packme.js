@@ -23,7 +23,7 @@ export default class Container {
 	}
 
 	output(containers) {
-		const code = [];
+		let code = [];
 		code.push("import { PackMe } from 'packme';");
 		Object.keys(this.includes).sort().forEach(filename => {
 			code.push(`import { ${this.includes[filename].join(', ')} } from './${filename}';`);

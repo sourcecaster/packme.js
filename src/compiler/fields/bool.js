@@ -16,7 +16,7 @@ export default class BoolField extends Field {
 	}
 
 	packer(name = '') {
-		return `this.$packBool(${name})`;
+		return `this.$packBool(this.${name})`;
 	}
 
 	unpacker() {

@@ -5,43 +5,33 @@ import Node from '../node.js';
 import { validName, isReserved, hashCode } from '../utils.js';
 
 function extractTag(tag) {
-	const m = /(.+?)@.+/.exec(tag);
-	return m ? m[1] : tag;
+	return /(.+?)@.+/.exec(tag)?.[1] ?? tag;
 }
 
 export default class Obj extends Node {
-	constructor(container, tag, manifest, options = {}) {
-		// Compute _inheritDescriptor from tag (e.g. "foo@inheritInfo")
-		const m = /.+?@(.+)$/.exec(tag);
-		const inheritDescriptor = m ? m[1] : '';
-		// Extract base tag (without inheritance part)
-		const baseTag = extractTag(tag);
-		// Call super with container, baseTag, and validName(baseTag, true)
-		super(container, baseTag, validName(baseTag, true), manifest);
+	fields = [];
+	_minBufferSize = 0;
 
-		this._inheritDescriptor = inheritDescriptor;
-		if (inheritDescriptor.indexOf(':') > 0) {
-			this.inheritFilename = inheritDescriptor.substring(0, inheritDescriptor.indexOf(':'));
-			this.inheritTag = inheritDescriptor.substring(inheritDescriptor.indexOf(':') + 1);
-		} else {
-			this.inheritFilename = container.filename;
-			this.inheritTag = inheritDescriptor;
-		}
+	constructor(container, tag, manifest, id, response) {
+		let inheritDescriptor = /.+?@(.+)$/.exec(tag)?.[1] ?? '';
+		let baseTag = extractTag(tag);
+		super(container, baseTag, validName(baseTag, true), manifest);
+		let colonIndex = inheritDescriptor.indexOf(':');
+		this.inheritFilename = colonIndex > 0 ? inheritDescriptor.substring(0, colonIndex) : container.filename;
+		this.inheritTag = colonIndex > 0 ? inheritDescriptor.substring(colonIndex + 1) : inheritDescriptor;
 		if (isReserved(this.name)) {
-			throw new Error(`Object node "${tag}" in ${container.filename}.json is resulted with the name "${this.name}", which is reserved.`);
+			throw `Object node "${tag}" in ${container.filename}.json is resulted with the name "${this.name}", which is a reserved keyword.`;
 		}
-		this.fields = [];
-		for (const entry of Object.entries(manifest)) {
-			const field = Field.fromEntry(this, entry);
+		for (let entry of Object.entries(manifest)) {
+			let field = Field.fromEntry(this, entry);
 			if (this.fields.some(f => f.name === field.name)) {
-				throw new Error(`Object declaration "${tag}" in ${container.filename}.json field "${entry[0]}" is parsed into a field with duplicating name "${field.name}".`);
+				throw `Object declaration "${tag}" in ${container.filename}.json field "${entry[0]}" is parsed into a field with duplicating name "${field.name}".`;
 			}
 			this.fields.push(field);
 		}
 		this._flagBytes = Math.ceil(this.fields.filter(f => f.optional).length / 8);
-		this._minBufferSize = 0; // Will be computed in output()
-		this.id = options.id ?? null;
-		this.response = options.response ?? null;
+		this.id = id ?? null;
+		this.response = response ?? null;
 	}
 
 	_getInheritedRoot() {
@@ -49,19 +39,18 @@ export default class Obj extends Node {
 	}
 
 	_getInheritedObject() {
-		const targetContainer = this.container.containers[this.inheritFilename];
-		if (!targetContainer) {
-			throw new Error(`Node "${this.tag}" in ${this.container.filename}.json refers to file "${this.inheritFilename}.json" which is not found.`);
+		let container = this.container.containers[this.inheritFilename];
+		if (container == null) {
+			throw `Node "${this.tag}" in ${this.container.filename}.json refers to file "${this.inheritFilename}.json" which is not found within the current compilation process.`;
 		}
-		const index = targetContainer.nodes.findIndex(n => n instanceof Obj && n.tag === this.inheritTag);
+		let index = container.nodes.findIndex(n => n instanceof Obj && n.tag === this.inheritTag);
 		if (index === -1) {
-			throw new Error(`Node "${this.tag}" in ${this.container.filename}.json refers to node "${this.inheritTag}" in ${this.inheritFilename}.json, but such enum/object node does not exist.`);
+			throw `Node "${this.tag}" in ${this.container.filename}.json refers to node "${this.inheritTag}" in ${this.inheritFilename}.json, but such enum/object node does not exist.`;
 		}
-		const resultObject = targetContainer.nodes[index];
-		// Check for field duplications with inherited object.
-		for (const field of this.fields) {
+		let resultObject = container.nodes[index];
+		for (let field of this.fields) {
 			if (resultObject.fields.findIndex(inheritedField => field.name === inheritedField.name) !== -1) {
-				throw new Error(`Node "${this.tag}" in ${this.container.filename}.json has a field "${field.name}" which is already inherited from node "${resultObject.tag}" in ${this.container.filename}.json.`);
+				throw `Node "${this.tag}" in ${this.container.filename}.json has a field "${field.name}" declaration which is already inherited from node "${resultObject.tag}" in ${this.container.filename}.json.`;
 			}
 		}
 		return resultObject;
@@ -70,7 +59,7 @@ export default class Obj extends Node {
 	_getInheritedFields() {
 		let result = [];
 		if (this.inheritTag !== '') {
-			const target = this._getInheritedObject();
+			let target = this._getInheritedObject();
 			result = result.concat(target._getInheritedFields());
 			result = result.concat(target.fields);
 		}
@@ -79,11 +68,10 @@ export default class Obj extends Node {
 
 	_getChildObjects() {
 		let result = {};
-		for (const c of Object.values(this.container.containers)) {
-			for (const o of c.objects) {
+		for (let c of Object.values(this.container.containers)) {
+			for (let o of c.objects) {
 				if (o.inheritFilename === this.container.filename && o.inheritTag === this.tag) {
-					const key = hashCode(validName(o.tag, true));
-					result[key] = o;
+					result[hashCode(validName(o.tag, true))] = o;
 					Object.assign(result, o._getChildObjects());
 				}
 			}
@@ -92,170 +80,102 @@ export default class Obj extends Node {
 	}
 
 	output() {
-		// Compute minimum buffer size from static fields
 		this._minBufferSize = this.fields
 			.filter(f => f.static)
 			.reduce((sum, f) => sum + f.size, this._flagBytes);
 
-		// If used by a message/request, add 8 bytes (command ID and transaction ID)
+		// Add 4 bytes for command ID and transaction ID if this node is used by message/request node
 		if (this.id != null) this._minBufferSize += 8;
 
-		const inheritedObject = this.inheritTag !== '' ? this._getInheritedObject() : null;
-		const inheritedFields = this._getInheritedFields();
-		const childObjects = this._getChildObjects();
+		let inheritedObject = this.inheritTag !== '' ? this._getInheritedObject() : null;
+		let inheritedFields = this._getInheritedFields();
+		let childObjects = this._getChildObjects();
 
-		// Add 4 bytes for inherited object class ID if needed
-		if (this.inheritTag !== '' || Object.keys(childObjects).length > 0) {
-			this._minBufferSize += 4;
-		}
+		// Add 4 bytes for specific inherited object class ID (to be able to unpack corresponding inherited object)
+		if (this.inheritTag !== '' || Object.keys(childObjects).length > 0) this._minBufferSize += 4;
 
-		const lines = [];
-		lines.push('');
-		if (this.inheritTag === '') {
-			lines.push(`class ${this.name} extends PackMeMessage {`);
-		} else {
-			lines.push(`class ${this.name} extends ${inheritedObject.name} {`);
-		}
+		return [
+            '',
+			`class ${this.name} extends ${this.inheritTag === '' ? 'PackMeMessage' : inheritedObject.name} {`,
+			...this.fields.map(f => f.declaration),
+			'',
+			...(this.fields.length > 0 ? ['/**', ...this.fields.map(f => f.comment), ' */'] : []),
+			`constructor (${[...inheritedFields, ...this.fields].map(f => f.name).join(', ')}) {`,
+				'if (arguments.length === 0) return super();',
+				...(this.inheritTag !== '' ? [`super(${inheritedFields.map(f => f.name).join(', ')});`] : ['super();']),
+				...this.fields.map(f => f.initializer),
+			'}',
+			'',
 
-		// Constructor
-		if (this.fields.length > 0) {
-			lines.push(`  constructor({`);
-			if (this.inheritTag !== '') {
-				inheritedFields.forEach(f => lines.push(`    ${f.attribute}`));
-			}
-			this.fields.forEach(f => lines.push(`    ${f.initializer}`));
-			if (this.inheritTag === '') {
-				lines.push(`  }) {`);
-				lines.push(`    // ... constructor body`);
-				lines.push(`  }`);
-			} else {
-				const inheritedArgs = inheritedFields.map(f => `${f.name}: ${f.name}`).join(', ');
-				lines.push(`  }) {`);
-				lines.push(`    super({ ${inheritedArgs} });`);
-				lines.push(`    // ... constructor body`);
-				lines.push(`  }`);
-			}
-		} else {
-			lines.push(`  constructor() { }`);
-		}
+            // if (inheritTag.isEmpty && childObjects.isNotEmpty) ...<String>[
+            //     r'static Map<Type, int> $kinIds = <Type, int>{',
+            //         '$name: 0,',
+            //         ...childObjects.entries.map((MapEntry<int, Object> row) => '${row.value.name}: ${row.key},'),
+            //     '};\n',
+            //     'static $name \$emptyKin(int id) {',
+            //         'switch (id) {',
+            //             ...childObjects.entries.map((MapEntry<int, Object> row) => 'case ${row.key}: return ${row.value.name}.\$empty();'),
+            //             'default: return $name.\$empty();',
+            //         '}',
+            //     '}\n'
+            // ],
+            // ...fields.map((Field field) => field.declaration),
 
-		// $empty static method
-		if (this.inheritTag === '') {
-			lines.push(`  static $empty() { }`);
-		} else {
-			lines.push(`  static $empty() { return new ${this.name}(); }`);
-		}
-		lines.push('');
+            ...(this.response != null ? [
+				'/**',
+				...this.response.fields.map(f => f.comment),
+                ` * @returns {${this.response.name}}`,
+				' */',
+				`$response(${this.response.fields.map(f => f.name).join(', ')}) {`,
+                    `let message = new ${this.response.name}(${this.response.fields.map(f => f.name).join(', ')});`,
+                    'message.$request = this;',
+                    'return message;',
+                '}',
+				'',
+            ] : []),
 
-		// If no inheritance and child objects exist, output kinIds mapping and $emptyKin
-		if (this.inheritTag === '' && Object.keys(childObjects).length > 0) {
-			lines.push(`  static $kinIds = {`);
-			lines.push(`    ${this.name}: 0,`);
-			for (const [key, obj] of Object.entries(childObjects)) {
-				lines.push(`    ${obj.name}: ${key},`);
-			}
-			lines.push(`  };`);
-			lines.push('');
-			lines.push(`  static $emptyKin(id) {`);
-			lines.push(`    switch (id) {`);
-			for (const [key, obj] of Object.entries(childObjects)) {
-				lines.push(`      case ${key}: return ${obj.name}.$empty();`);
-			}
-			lines.push(`      default: return ${this.name}.$empty();`);
-			lines.push(`    }`);
-			lines.push(`  }`);
-			lines.push('');
-		}
-
-		// Field declarations
-		this.fields.forEach(field => {
-			lines.push(`  ${field.declaration}`);
-		});
-
-		// Response method if response exists
-		if (this.response != null) {
-			lines.push('');
-			if (this.response.fields && this.response.fields.length > 0) {
-				lines.push(`  $response({`);
-				this.response.fields.forEach(f => lines.push(`    ${f.attribute}`));
-				lines.push(`  }) {`);
-				lines.push(`    // ... response body`);
-				lines.push(`  }`);
-			} else {
-				lines.push(`  $response() {`);
-				lines.push(`    const message = new ${this.response.name}(${this.response.fields.map(f => `${f.name}: ${f.name}`).join(', ')});`);
-				lines.push(`    message.$request = this;`);
-				lines.push(`    return message;`);
-				lines.push(`  }`);
-			}
-		}
-
-		lines.push('');
-		// $estimate method
-		lines.push(`  $estimate() {`);
-		if (this.inheritTag === '') {
-			lines.push(`    this.$reset();`);
-		} else {
-			lines.push(`    let _bytes = super.$estimate();`);
-		}
-		if (this.fields.filter(f => !f.static).length > 0 || this.inheritTag !== '') {
-			if (this.inheritTag === '') {
-				lines.push(`    let _bytes = ${this._minBufferSize};`);
-			} else if (this._minBufferSize > 0) {
-				lines.push(`    _bytes += ${this._minBufferSize};`);
-			}
-			this.fields.forEach(f => {
-				f.estimate.forEach(line => lines.push(`    ${line}`));
-			});
-			lines.push(`    return _bytes;`);
-		} else {
-			lines.push(`    return ${this._minBufferSize};`);
-		}
-		lines.push(`  }`);
-		lines.push('');
-		// $pack method
-		lines.push(`  $pack() {`);
-		if (this.id != null) {
-			lines.push(`    this.$initPack(${this.id});`);
-		}
-		if (this.inheritTag !== '') {
-			lines.push(`    super.$pack();`);
-		} else if (Object.keys(childObjects).length > 0) {
-			lines.push(`    this.$packUint32($kinIds[runtimeType] ?? 0);`);
-		}
-		if (this._flagBytes > 0) {
-			lines.push(`    for (let i = 0; i < ${this._flagBytes}; i++) this.$packUint8($flags[i]);`);
-		}
-		this.fields.forEach(f => {
-			f.pack.forEach(line => lines.push(`    ${line}`));
-		});
-		lines.push(`  }`);
-		lines.push('');
-		// $unpack method
-		lines.push(`  $unpack() {`);
-		if (this.id != null) {
-			lines.push(`    this.$initUnpack();`);
-		}
-		if (this.inheritTag !== '') {
-			lines.push(`    super.$unpack();`);
-		}
-		if (this._flagBytes > 0) {
-			lines.push(`    for (let i = 0; i < ${this._flagBytes}; i++) $flags.push(this.$unpackUint8());`);
-		}
-		this.fields.forEach(f => {
-			f.unpack.forEach(line => lines.push(`    ${line}`));
-		});
-		lines.push(`  }`);
-		lines.push('');
-		// toString method
-		lines.push(`  toString() {`);
-		lines.push(
-			`    return '${this.name}\\x1b[0m(' + [${[...inheritedFields, ...this.fields]
-				.map(f => `'${f.name}: ' + PackMe.dye(${f.name})`)
-				.join(', ')}].join(', ') + ')';`
-		);
-		lines.push(`  }`);
-		lines.push(`}`);
-		return lines;
+            '$estimate() {',
+				...(this.inheritTag === '' ? [
+					'this.$reset();'
+				] : [
+					'let bytes = super.$estimate();'
+				]),
+				...(this.fields.some(f => !f.static) || this.inheritTag !== '' ? [
+					...(this.inheritTag === '' ? [
+						`let bytes = ${this._minBufferSize};`
+					] : this._minBufferSize > 0 ? [
+						`bytes += ${this._minBufferSize};`
+					] : []),
+					...this.fields.reduce((a, b) => a.concat(b.estimate), []),
+					'return bytes;'
+				] : [
+					`return ${this._minBufferSize};`,
+				]),
+            '}',
+			'',
+            '$pack() {',
+                ...(this.id != null ? [`this.$initPack(${this.id});`] : []),
+                ...(this.inheritTag !== '' ? [
+					'super.$pack();'
+				] : childObjects.length > 0 ? [
+					'this.$packUint32($kinIds[runtimeType] ?? 0);'
+				] : []),
+                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
+                ...this.fields.reduce((a, b) => a.concat(b.pack), []),
+            '}',
+			'',
+            '$unpack() {',
+                ...(this.id != null ? ['this.$initUnpack();'] : []), // command ID
+				...(this.inheritTag !== '' ? ['super.$unpack();'] : []),
+                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$flags.push(this.$unpackUint8());`] : []),
+                ...this.fields.reduce((a, b) => a.concat(b.unpack), []),
+            '}',
+			'',
+            '/** @returns {string} */',
+            'toString() {',
+                `return \`${this.name}\\x1b[0m(${[...inheritedFields, ...this.fields].map(f => `${f.name}: \${PackMe.dye(this.${f.name})}`).join(', ')})\`;`,
+            '}',
+            '}'
+        ];
 	}
 }

@@ -18,7 +18,7 @@ export default class IntField extends Field {
 	}
 
 	packer(name = '') {
-		return `this.$pack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}(${name})`;
+		return `this.$pack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}(this.${name})`;
 	}
 
 	unpacker() {

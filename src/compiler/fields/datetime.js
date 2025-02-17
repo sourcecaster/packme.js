@@ -16,7 +16,7 @@ export default class DateTimeField extends Field {
 	}
 
 	packer(name = '') {
-		return `this.$packDateTime(${name})`;
+		return `this.$packDateTime(this.${name})`;
 	}
 
 	unpacker() {

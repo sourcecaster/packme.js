@@ -17,7 +17,7 @@ export default class FloatField extends Field {
 	}
 
 	packer(name = '') {
-		return this.bytes === 8 ? `this.$packDouble(${name})` : `this.$packFloat(${name})`;
+		return this.bytes === 8 ? `this.$packDouble(this.${name})` : `this.$packFloat(this.${name})`;
 	}
 
 	unpacker() {

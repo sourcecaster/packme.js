@@ -14,15 +14,15 @@ export default class ArrayField extends Field {
 
 	estimator(name = '') {
 		return this.field.static
-			? `4 + ${name}.length * ${this.field.size}`
-			: `4 + ${name}.reduce((a, b) => a + ${this.field.estimator('b')}, 0)`;
+			? `4 + this.${name}.length * ${this.field.size}`
+			: `4 + this.${name}.reduce((a, b) => a + ${this.field.estimator('b')}, 0)`;
 	}
 
 	packer(name = '') {
 		return [
-			`this.$packUint32(${name}.length);`,
-			`for (let i = 0; i < ${name}.length; i++) {`,
-			`  ${this.field.packer(`${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
+			`this.$packUint32(this.${name}.length);`,
+			`for (let i = 0; i < this.${name}.length; i++) {`,
+			`  ${this.field.packer(`this.${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
 			`}`
 		].join('\n');
 	}

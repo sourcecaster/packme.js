@@ -7,7 +7,7 @@ import Obj from '../nodes/object.js';
 export default class ReferenceField extends Field {
 	constructor(node, tag, manifest) {
 		super(node, tag, manifest);
-		const colonIndex = manifest.indexOf(':');
+		let colonIndex = manifest.indexOf(':');
 		this.filename = colonIndex > 1 ? manifest.substring(1, colonIndex) : node.container.filename;
 		this.external = colonIndex > 1 && manifest.substring(1, colonIndex) !== node.container.filename;
 		this.referenceTag = colonIndex > 1 ? manifest.substring(colonIndex + 1) : manifest.substring(1);
@@ -18,7 +18,7 @@ export default class ReferenceField extends Field {
 	}
 
 	get referenceNode() {
-		const container = this.node.container.containers[this.filename];
+		let container = this.node.container.containers[this.filename];
 		if (container == null) {
 			throw `Field "${this.tag}" of node "${this.node.tag}" in ${this.node.container.filename}.json refers to file "${this.filename}.json" which is not found within the current compilation process.`;
 		}
@@ -44,13 +44,13 @@ export default class ReferenceField extends Field {
 	estimator(name = '') {
 		return this.referenceNode instanceof Enum
 			? '1'
-			: `${name}.$estimate()`;
+			: `this.${name}.$estimate()`;
 	}
 
 	packer(name = '') {
 		return this.referenceNode instanceof Enum
-			? `this.$packUint8(${name}.index)`
-			: `this.$packMessage(${name})`;
+			? `this.$packUint8(this.${name}.index)`
+			: `this.$packMessage(this.${name})`;
 	}
 
 	unpacker(name = '') {

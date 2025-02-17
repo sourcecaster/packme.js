@@ -18,7 +18,7 @@ export default class BinaryField extends Field {
 	}
 
 	packer(name = '') {
-		return `this.$packBinary(${name}, ${this.bytes})`;
+		return `this.$packBinary(this.${name}, ${this.bytes})`;
 	}
 
 	unpacker() {
