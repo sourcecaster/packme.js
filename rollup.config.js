@@ -4,12 +4,11 @@ const production = !process.env.ROLLUP_WATCH;
 
 export default [
 	{
-		input: 'lib/packme.js',
+		input: 'src/index.js',
 		output: {
-			sourcemap: true,
-			format: 'iife',
-			name: 'packme',
-			file: 'build/packme.min.js'
+			file: production ? 'dist/packme.min.js' : 'dist/packme.js',
+			format: 'es',
+			sourcemap: !production
 		},
 		plugins: [
 			production && terser()
@@ -19,16 +18,13 @@ export default [
 		}
 	},
 	{
-		input: 'lib/compiler.js',
+		input: 'src/compiler/index.js',
 		output: {
-			sourcemap: true,
-			format: 'iife',
-			name: 'compiler',
-			file: 'build/compile.min.js'
+			file: 'bin/compile.js',
+			format: 'es',
+			sourcemap: !production,
+			banner: '#!/usr/bin/env node'
 		},
-		plugins: [
-			production && terser()
-		],
 		watch: {
 			clearScreen: false
 		}
