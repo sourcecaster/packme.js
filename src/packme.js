@@ -6,7 +6,7 @@ class PackMe {
 		this.#onError = onError;
 	}
 
-	/** @return {string} */
+	/** @returns {string} */
 	static dye(/** any */ x) {
 		return typeof x === 'string' ? `\x1b[32m${x}\x1b[0m`
 			: typeof x === 'number' || typeof x === 'bigint' || typeof x === 'boolean' ? `\x1b[34m${x}\x1b[0m`
@@ -15,14 +15,14 @@ class PackMe {
 						: `\x1b[35m${x}\x1b[0m`;
 	}
 
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	register(/** Object */ messageFactory) {
 		for (let key in messageFactory) {
 			this.#factory[key] = messageFactory[key];
 		}
 	}
 
-	/** @return {?Uint8Array} */
+	/** @returns {?Uint8Array} */
 	pack(/** PackMeMessage */ message) {
 		try {
 			message.$pack();
@@ -34,7 +34,7 @@ class PackMe {
 		}
 	}
 
-	/** @return {?PackMeMessage} */
+	/** @returns {?PackMeMessage} */
 	unpack(/** Uint8Array */ data) {
 		try {
 			if (data.length < 4) return null;

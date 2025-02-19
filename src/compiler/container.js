@@ -24,7 +24,7 @@ export default class Container {
 
 	output(containers) {
 		let code = [];
-		code.push("import { PackMe } from 'packme';");
+		code.push("import { PackMe, PackMeMessage } from 'packme';");
 		Object.keys(this.includes).sort().forEach(filename => {
 			code.push(`import { ${this.includes[filename].join(', ')} } from './${filename}';`);
 		});
@@ -35,11 +35,11 @@ export default class Container {
 		this.requests.forEach(node => code.push(...node.output()));
 		if (this.messages.length > 0 || this.requests.length > 0) {
 			code.push('');
-			code.push(`let ${validName(this.filename)}MessageFactory = {`);
-			code.push(...this.messages.map(message => `${message.id}: () => ${message.name}.$empty(),`));
-			code.push(...this.requests.map(request => `${request.id}: () => ${request.name}.$empty(),`));
-			code.push(...this.requests.map(request => `${request.responseId}: () => ${request.responseName}.$empty(),`));
-			code.push('};');
+			code.push(`export const ${validName(this.filename)}MessageFactory = Object.freeze({`);
+			code.push(...this.messages.map(message => `${message.id}: () => new ${message.name}(),`));
+			code.push(...this.requests.map(request => `${request.id}: () => new ${request.name}(),`));
+			code.push(...this.requests.map(request => `${request.responseId}: () => new ${request.responseName}(),`));
+			code.push('});');
 		}
 		return code;
 	}

@@ -24,8 +24,8 @@ export default class Enum extends Node {
 	output() {
 		return [
 			'',
-			`const ${this.name} = Object.freeze({`,
-			...this.values.map(v => `${v}: Symbol('${v}'),`),
+			`export const ${this.name} = Object.freeze({`,
+			...this.values.map((v, i) => `${v}: ${i},`),
 			'})'
 		];
 	}

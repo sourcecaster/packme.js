@@ -41,24 +41,24 @@ export default class ReferenceField extends Field {
 		return !this.optional && this.referenceNode instanceof Enum;
 	}
 
-	estimator(name = '') {
+	estimator(name = '', local = false) {
 		return this.referenceNode instanceof Enum
 			? '1'
-			: `this.${name}.$estimate()`;
+			: `${local ? '' : 'this.'}${name}.$estimate()`;
 	}
 
 	packer(name = '') {
 		return this.referenceNode instanceof Enum
-			? `this.$packUint8(this.${name}.index)`
+			? `this.$packUint8(this.${name})`
 			: `this.$packMessage(this.${name})`;
 	}
 
 	unpacker(name = '') {
 		let ref = this.referenceNode;
 		return ref instanceof Enum
-			? `${ref.name}.values[this.$unpackUint8()]`
+			? `this.$unpackUint8()`
 			: ref instanceof Obj && (ref.inheritTag !== '' || ref._getChildObjects().length > 0)
 				? `this.$unpackMessage(${ref._getInheritedRoot().name}.$emptyKin(this.$unpackUint32()))`
-				: `this.$unpackMessage(${ref.name}.$empty())`;
+				: `this.$unpackMessage(new ${ref.name}())`;
 	}
 }

@@ -59,7 +59,7 @@ export default class Field {
 
 	// Get initialization code
 	get initializer() {
-		return `this.${this.name} = ${this.optional ? `this.$ensure('${this.name}', ${this.name});` : this.name};`;
+		return `this.${this.name} = ${this.optional ? this.name : `this.$ensure('${this.name}', ${this.name})`};`;
 	}
 
 	// Get estimate buffer size code

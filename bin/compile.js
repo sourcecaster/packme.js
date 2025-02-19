@@ -41,6 +41,26 @@ function validName(input, firstCapital = false) {
 	return result;
 }
 
+/**
+ * Auto indents an array of code lines.
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+function formatCode(lines) {
+	let indent = 0;
+	let reOpen = /\{[^\}]*$/;
+	let reClose = /^[^\{]*\}/;
+	let reEmpty = /^\s*$/;
+	for (let i = 0; i < lines.length; i++) {
+		let increase = reOpen.test(lines[i]);
+		let decrease = reClose.test(lines[i]);
+		if (decrease) indent--;
+		if (!reEmpty.test(lines[i])) lines[i] = '\t'.repeat(indent) + lines[i];
+		if (increase) indent++;
+	}
+	return lines;
+}
+
 // Plural to singular conversion rules
 let singularRules = new Map([
 	[ /men$/i, () => 'man' ],
@@ -116,6 +136,54 @@ function hashCode(str) {
 	return (hash === 0) ? 1 : hash;
 }
 
+// This class describes a single entity (node) in manifest file (whether it's enum, object, message or request).
+
+let nodes = {};
+
+class Node {
+	constructor(container, tag, name, manifest) {
+		this.container = container;
+		this.tag = tag;
+		this.name = name;
+		this.manifest = manifest;
+	}
+
+	// Try to create a Node instance of corresponding type
+	static fromEntry(container, entry) {
+		let [key, value] = entry;
+		if (validName(key) === '') throw `Node "${key}" in ${container.filename}.json is resulted with the name parsed into an empty string.`;
+		if (isObject(value)) return new nodes.Obj(container, key, value);
+		if (value instanceof Array) {
+			if (value.length === 1 && isObject(value[0])) return new nodes.Message(container, key, value);
+			if (value.length === 2 && isObject(value[0]) && isObject(value[1])) return new nodes.Request(container, key, value);
+			if (value.length > 0 && value.every(item => typeof item === 'string')) return new nodes.Enum(container, key, value);
+		}
+		throw `Node "${key}" in ${container.filename}.json has invalid format. Use array of strings for enum declaration, object for object declaration or array of 1 or 2 objects for message or request correspondingly.`;
+	}
+
+	// Adds a reference to import from another file
+	include(filename, name) {
+		filename += '.generated.js';
+		name = validName(name, true);
+		this.container.includes[filename] ??= [];
+		if (!this.container.includes[filename].includes(name)) {
+			this.container.includes[filename].push(name);
+			this.container.includes[filename].sort();
+		}
+	}
+
+	// Adds an embedded node to output its code
+	embed(node) {
+		this.container.embedded.push(node);
+		this.container.embedded.sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	// Return resulting code, must be overridden.
+	output() {
+		return [];
+	}
+}
+
 // This class describes enum node declared in manifest.
 
 class Enum extends Node {
@@ -139,306 +207,16 @@ class Enum extends Node {
 	output() {
 		return [
 			'',
-			`const ${this.name} = Object.freeze({`,
-			...this.values.map(v => `${v}: Symbol('${v}')`),
+			`export const ${this.name} = Object.freeze({`,
+			...this.values.map((v, i) => `${v}: ${i},`),
 			'})'
 		];
 	}
 }
 
-// This class describes object field of array type [<type>].
-
-class ArrayField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-		this.field = Field.fromEntry(node, [tag, manifest[0]], true);
-	}
-
-	get type() {
-		return 'any[]';
-	}
-
-	estimator(name = '') {
-		return this.field.static
-			? `4 + ${name}.length * ${this.field.size}`
-			: `4 + ${name}.reduce((a, b) => a + ${this.field.estimator('b')}, 0)`;
-	}
-
-	packer(name = '') {
-		return [
-			`this.$packUint32(${name}.length);`,
-			`for (let i = 0; i < ${name}.length; i++) {`,
-			`  ${this.field.packer(`${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
-			`}`
-		].join('\n');
-	}
-
-	unpacker() {
-		return [
-			`Array.from({ length: this.$unpackUint32() }, (_, i) => {`,
-			`  return ${this.field.unpacker()}${!(this.field instanceof ArrayField) ? ';' : ''}`,
-			`})`
-		].join('\n');
-	}
-
-	get pack() {
-		let lines = [];
-		if (this.optional) lines.push(`if (${this.name} != null) {`);
-		lines.push(...this.packer(this.name).split('\n'));
-		if (this.optional) lines.push('}');
-		return lines;
-	}
-
-	get unpack() {
-		let lines = [];
-		if (this.optional) lines.push('if (this.$getFlag()) {');
-		lines.push(...`${this.name} = ${this.unpacker(this.name)}`.split('\n'));
-		if (this.optional) lines.push('}');
-		return lines;
-	}
-}
-
-// This class describes object field of type binary.
-
-class BinaryField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-		this.bytes = parseInt(manifest.substring(6));
-		node.container.importTypedData = true;
-	}
-
-	get type() {
-		return 'Uint8Array';
-	}
-
-	get size() {
-		return this.bytes;
-	}
-
-	packer(name = '') {
-		return `this.$packBinary(${name}, ${this.bytes})`;
-	}
-
-	unpacker() {
-		return `this.$unpackBinary(${this.bytes})`;
-	}
-}
-
-// This class describes object field of type bool.
-
-class BoolField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-	}
-
-	get type() {
-		return 'boolean';
-	}
-
-	get size() {
-		return 1;
-	}
-
-	packer(name = '') {
-		return `this.$packBool(${name})`;
-	}
-
-	unpacker() {
-		return `this.$unpackBool()`;
-	}
-}
-
-// This class describes object field of type datetime.
-
-class DateTimeField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-	}
-
-	get type() {
-		return 'Date';
-	}
-
-	get size() {
-		return 8;
-	}
-
-	packer(name = '') {
-		return `this.$packDateTime(${name})`;
-	}
-
-	unpacker() {
-		return `this.$unpackDateTime()`;
-	}
-}
-
-// This class describes object field of type float/double.
-
-class FloatField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-		this.bytes = manifest === 'float' ? 4 : 8;
-	}
-
-	get type() {
-		return 'number';
-	}
-
-	get size() {
-		return this.bytes;
-	}
-
-	packer(name = '') {
-		return this.bytes === 8 ? `this.$packDouble(${name})` : `this.$packFloat(${name})`;
-	}
-
-	unpacker() {
-		return this.bytes === 8 ? `this.$unpackDouble()` : `this.$unpackFloat()`;
-	}
-}
-
-// This class describes object field of type int8/uint8/int16/uint16/int32/uint32/int64/uint64.
-
-class IntField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-		this.signed = manifest[0] !== 'u';
-		this.bytes = Math.round(parseInt(manifest.replace(/\D/g, '')) / 8);
-	}
-
-	get type() {
-		return 'number';
-	}
-
-	get size() {
-		return this.bytes;
-	}
-
-	packer(name = '') {
-		return `this.$pack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}(${name})`;
-	}
-
-	unpacker() {
-		return `this.$unpack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}()`;
-	}
-}
-
-// This class describes object field of object type { ... }.
-
-class ObjectField extends Field {
-	constructor(node, tag, manifest, parentIsArray = false) {
-		super(node, tag, manifest);
-		this.embeddedObject = new ObjectField(node.container, `${node.tag}_${parentIsArray ? toSingular(tag) : tag}`, manifest);
-		node.embed(this.embeddedObject);
-	}
-
-	get type() {
-		return this.embeddedObject.name;
-	}
-
-	estimator(name = '') {
-		return `${name}.$estimate()`;
-	}
-
-	packer(name = '') {
-		return `this.$packMessage(${name})`;
-	}
-
-	unpacker() {
-		return `this.$unpackMessage(${this.embeddedObject.name}.$empty())`;
-	}
-
-	output() {
-		return this.embeddedObject.output();
-	}
-}
-
-// This class describes object field of reference type @[filename:]<node>.
-
-class ReferenceField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-		let colonIndex = manifest.indexOf(':');
-		this.filename = colonIndex > 1 ? manifest.substring(1, colonIndex) : node.container.filename;
-		this.external = colonIndex > 1 && manifest.substring(1, colonIndex) !== node.container.filename;
-		this.referenceTag = colonIndex > 1 ? manifest.substring(colonIndex + 1) : manifest.substring(1);
-		if (this.referenceTag === '') {
-			throw `Field "${tag}" of node "${node.tag}" in ${node.container.filename}.json has reference filename "${this.filename}.json" but no reference node.`;
-		}
-		if (this.filename !== node.container.filename) node.include(this.filename, this.referenceTag);
-	}
-
-	get referenceNode() {
-		let container = this.node.container.containers[this.filename];
-		if (container == null) {
-			throw `Field "${this.tag}" of node "${this.node.tag}" in ${this.node.container.filename}.json refers to file "${this.filename}.json" which is not found within the current compilation process.`;
-		}
-		let ref = container.nodes.find(n => (n instanceof Enum || n instanceof Obj) && n.tag === this.referenceTag);
-		if (ref == null) {
-			throw `Field "${this.tag}" of node "${this.node.tag}" in ${this.node.container.filename}.json refers to node "${this.referenceTag}" in ${this.filename}.json, but such enum/object node does not exist.`;
-		}
-		return ref;
-	}
-
-	get type() {
-		return this.referenceNode.name;
-	}
-
-	get size() {
-		return this.static ? 1 : 0;
-	}
-
-	get static() {
-		return !this.optional && this.referenceNode instanceof Enum;
-	}
-
-	estimator(name = '') {
-		return this.referenceNode instanceof Enum
-			? '1'
-			: `${name}.$estimate()`;
-	}
-
-	packer(name = '') {
-		return this.referenceNode instanceof Enum
-			? `this.$packUint8(${name}.index)`
-			: `this.$packMessage(${name})`;
-	}
-
-	unpacker(name = '') {
-		let ref = this.referenceNode;
-		return ref instanceof Enum
-			? `${ref.name}.values[this.$unpackUint8()]`
-			: ref instanceof Obj && (ref.inheritTag !== '' || ref._getChildObjects().length > 0)
-				? `this.$unpackMessage(${ref._getInheritedRoot().name}.$emptyKin(this.$unpackUint32()))`
-				: `this.$unpackMessage(${ref.name}.$empty())`;
-	}
-}
-
-// This class describes object field of type string.
-
-class StringField extends Field {
-	constructor(node, tag, manifest) {
-		super(node, tag, manifest);
-	}
-
-	get type() {
-		return 'string';
-	}
-
-	estimator(name = '') {
-		return `this.$stringBytes(${name})`;
-	}
-
-	packer(name = '') {
-		return `this.$packString(${name})`;
-	}
-
-	unpacker() {
-		return `this.$unpackString()`;
-	}
-}
-
 // This class describes a single field entry of the object, message or request.
+
+let fields = {};
 
 class Field {
 	constructor(node, tag, manifest) {
@@ -455,16 +233,16 @@ class Field {
 	static fromEntry(node, entry, parentIsArray = false) {
 		let [key, value] = entry;
 		if (typeof value === 'string') {
-			if (value === 'bool') return new BoolField(node, key, value);
-			if (['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64'].includes(value)) return new IntField(node, key, value);
-			if (['float', 'double'].includes(value)) return new FloatField(node, key, value);
-			if (value === 'string') return new StringField(node, key, value);
-			if (value === 'datetime') return new DateTimeField(node, key, value);
-			if (/^binary\d+$/.test(value)) return new BinaryField(node, key, value);
-			if (/^@.+/.test(value)) return new ReferenceField(node, key, value);
+			if (value === 'bool') return new fields.BoolField(node, key, value);
+			if (['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64'].includes(value)) return new fields.IntField(node, key, value);
+			if (['float', 'double'].includes(value)) return new fields.FloatField(node, key, value);
+			if (value === 'string') return new fields.StringField(node, key, value);
+			if (value === 'datetime') return new fields.DateTimeField(node, key, value);
+			if (/^binary\d+$/.test(value)) return new fields.BinaryField(node, key, value);
+			if (/^@.+/.test(value)) return new fields.ReferenceField(node, key, value);
 		}
-		if (value instanceof Array && value.length === 1) return new ArrayField(node, key, value);
-		if (isObject(value)) return new ObjectField(node, key, value, parentIsArray);
+		if (value instanceof Array && value.length === 1) return new fields.ArrayField(node, key, value);
+		if (isObject(value)) return new fields.ObjectField(node, key, value, parentIsArray);
 		throw `Field "${key}" of node "${node.tag}" in ${node.container.filename}.json has an invalid type. ` +
 			'Valid types are: bool, int8, uint8, int16, uint16, int32, uint32, int64, uint64, float, double, datetime, string, binary# (e.g.: "binary16"). ' +
 			'It can also be an array of type (e.g. ["int8"]), a reference to an object (e.g. "@item") or an embedded object: { <field>: <type>, ... }';
@@ -480,42 +258,42 @@ class Field {
 
 	// Get whether it has a fixed footprint (always fixed size in a buffer) or not
 	get static() {
-		return !this.optional && !(this instanceof ArrayField) && !(this instanceof ObjectField) && !(this instanceof StringField);
+		return !this.optional && !(this instanceof fields.ArrayField) && !(this instanceof fields.ObjectField) && !(this instanceof fields.StringField);
 	}
 
 	/// Returns code of class field declaration.
 	get declaration() {
-		return `/** @type {${this.type}} */ ${this.optional ? `[${this.name}]` : this.name};`;
+		return `/** @type {${this.type}} */ ${this.name};`;
 	}
 
 	// Get comment @param string
 	get comment() {
-		return ` * @param {${this.type}} ` + this.optional ? `[${this.name}]` : this.name;
+		return ` * @param {${this.type}} ${this.optional ? `[${this.name}]` : this.name}`;
 	}
 
 	// Get initialization code
 	get initializer() {
-		return `this.${this.name} = ${this.optional ? `this.$ensure('${this.name}', ${this.name});` : this.name};`;
+		return `this.${this.name} = ${this.optional ? this.name : `this.$ensure('${this.name}', ${this.name})`};`;
 	}
 
 	// Get estimate buffer size code
 	get estimate() {
 		if (this.static) return [];
 		let lines = [];
-		if (this.optional) lines.push(`$setFlag(${this.name} != null);`);
-		if (this.optional) lines.push(`if (${this.name} != null) bytes += ${this.estimator(this.name)};`);
+		if (this.optional) lines.push(`this.$setFlag(this.${this.name} != null);`);
+		if (this.optional) lines.push(`if (this.${this.name} != null) bytes += ${this.estimator(this.name)};`);
 		else lines.push(`bytes += ${this.estimator(this.name)};`);
 		return lines;
 	}
 
 	// Get pack data into the buffer code
 	get pack() {
-		return [`${this.optional ? `if (${this.name} != null) ` : ''}${this.packer(this.name)};`];
+		return [`${this.optional ? `if (this.${this.name} != null) ` : ''}${this.packer(this.name)};`];
 	}
 
 	// Get unpack data from the buffer code
 	get unpack() {
-		return [`${this.optional ? `if ($getFlag()) ` : ''}${this.name} = ${this.unpacker(this.name)};`];
+		return [`${this.optional ? `if (this.$getFlag()) ` : ''}this.${this.name} = ${this.unpacker(this.name)};`];
 	}
 }
 
@@ -613,37 +391,36 @@ class Obj extends Node {
 
 		return [
             '',
-			`class ${this.name} extends ${this.inheritTag === '' ? 'PackMeMessage' : inheritedObject.name} {`,
+			`export class ${this.name} extends ${this.inheritTag === '' ? 'PackMeMessage' : inheritedObject.name} {`,
 			...this.fields.map(f => f.declaration),
 			'',
-			...(this.fields.length > 0 ? ['/**', ...this.fields.map(f => f.comment), ' */'] : []),
+			...(this.inheritTag === '' && Object.keys(childObjects).length > 0 ? [
+				`static $kinIds = new Map([`,
+					`	[${this.name}, 0],`,
+					...Object.entries(childObjects).map(([key, value]) => `	[${value.name}, ${key}],`),
+				']);',
+				'',
+				`static $emptyKin(id) {`,
+					'switch (id) {',
+						...Object.entries(childObjects).map(([key, value]) => `case ${key}: return new ${value.name}();`),
+						`default: return new ${this.name}();`,
+					'}',
+				'}',
+				''
+			] : []),
+			...(inheritedFields.length + this.fields.length > 0 ? ['/**', ...[...inheritedFields, ...this.fields].map(f => f.comment), ' */'] : []),
 			`constructor (${[...inheritedFields, ...this.fields].map(f => f.name).join(', ')}) {`,
 				'if (arguments.length === 0) return super();',
 				...(this.inheritTag !== '' ? [`super(${inheritedFields.map(f => f.name).join(', ')});`] : ['super();']),
 				...this.fields.map(f => f.initializer),
 			'}',
 			'',
-
-            // if (inheritTag.isEmpty && childObjects.isNotEmpty) ...<String>[
-            //     r'static Map<Type, int> $kinIds = <Type, int>{',
-            //         '$name: 0,',
-            //         ...childObjects.entries.map((MapEntry<int, Object> row) => '${row.value.name}: ${row.key},'),
-            //     '};\n',
-            //     'static $name \$emptyKin(int id) {',
-            //         'switch (id) {',
-            //             ...childObjects.entries.map((MapEntry<int, Object> row) => 'case ${row.key}: return ${row.value.name}.\$empty();'),
-            //             'default: return $name.\$empty();',
-            //         '}',
-            //     '}\n'
-            // ],
-            // ...fields.map((Field field) => field.declaration),
-
             ...(this.response != null ? [
 				'/**',
 				...this.response.fields.map(f => f.comment),
                 ` * @returns {${this.response.name}}`,
 				' */',
-				`$response(${this.response.fields.map(f => f.name).join(', ')}) {`
+				`$response(${this.response.fields.map(f => f.name).join(', ')}) {`,
                     `let message = new ${this.response.name}(${this.response.fields.map(f => f.name).join(', ')});`,
                     'message.$request = this;',
                     'return message;',
@@ -663,7 +440,7 @@ class Obj extends Node {
 					] : this._minBufferSize > 0 ? [
 						`bytes += ${this._minBufferSize};`
 					] : []),
-					...this.fields.reduce((a, b) => a.concat(b.estimate)),
+					...this.fields.reduce((a, b) => a.concat(b.estimate), []),
 					'return bytes;'
 				] : [
 					`return ${this._minBufferSize};`,
@@ -674,8 +451,8 @@ class Obj extends Node {
                 ...(this.id != null ? [`this.$initPack(${this.id});`] : []),
                 ...(this.inheritTag !== '' ? [
 					'super.$pack();'
-				] : childObjects.length > 0 ? [
-					'this.$packUint32($kinIds[runtimeType] ?? 0);'
+				] : Object.keys(childObjects).length > 0 ? [
+					`this.$packUint32(${this._getInheritedRoot().name}.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
 				] : []),
                 ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.pack), []),
@@ -745,52 +522,6 @@ class Request extends Node {
 	}
 }
 
-// This class describes a single entity (node) in manifest file (whether it's enum, object, message or request).
-
-class Node {
-	constructor(container, tag, name, manifest) {
-		this.container = container;
-		this.tag = tag;
-		this.name = name;
-		this.manifest = manifest;
-	}
-
-	// Try to create a Node instance of corresponding type
-	static fromEntry(container, entry) {
-		let [key, value] = entry;
-		if (validName(key) === '') throw `Node "${key}" in ${container.filename}.json is resulted with the name parsed into an empty string.`;
-		if (isObject(value)) return new Obj(container, key, value);
-		if (value instanceof Array) {
-			if (value.length === 1 && isObject(value[0])) return new Message(container, key, value);
-			if (value.length === 2 && isObject(value[0]) && isObject(value[1])) return new Request(container, key, value);
-			if (value.length > 0 && value.every(item => typeof item === 'string')) return new Enum(container, key, value);
-		}
-		throw `Node "${key}" in ${container.filename}.json has invalid format. Use array of strings for enum declaration, object for object declaration or array of 1 or 2 objects for message or request correspondingly.`;
-	}
-
-	// Adds a reference to import from another file
-	include(filename, name) {
-		filename += '.generated.js';
-		name = validName(name, true);
-		this.container.includes[filename] ??= [];
-		if (!this.container.includes[filename].includes(name)) {
-			this.container.includes[filename].push(name);
-			this.container.includes[filename].sort();
-		}
-	}
-
-	// Adds an embedded node to output its code
-	embed(node) {
-		this.container.embedded.push(node);
-		this.container.embedded.sort((a, b) => a.name.localeCompare(b.name));
-	}
-
-	// Return resulting code, must be overridden.
-	output() {
-		return [];
-	}
-}
-
 // This class describes a container of nodes which corresponds to single manifest file.
 
 class Container {
@@ -810,7 +541,7 @@ class Container {
 
 	output(containers) {
 		let code = [];
-		code.push("import { PackMe } from 'packme';");
+		code.push("import { PackMe, PackMeMessage } from 'packme';");
 		Object.keys(this.includes).sort().forEach(filename => {
 			code.push(`import { ${this.includes[filename].join(', ')} } from './${filename}';`);
 		});
@@ -821,17 +552,323 @@ class Container {
 		this.requests.forEach(node => code.push(...node.output()));
 		if (this.messages.length > 0 || this.requests.length > 0) {
 			code.push('');
-			code.push(`let ${validName(this.filename)}MessageFactory = {`);
-			code.push(...this.messages.map(message => `${message.id}: () => ${message.name}.$empty(),`));
-			code.push(...this.requests.map(request => `${request.id}: () => ${request.name}.$empty(),`));
-			code.push(...this.requests.map(request => `${request.responseId}: () => ${request.responseName}.$empty(),`));
-			code.push('};');
+			code.push(`export const ${validName(this.filename)}MessageFactory = Object.freeze({`);
+			code.push(...this.messages.map(message => `${message.id}: () => new ${message.name}(),`));
+			code.push(...this.requests.map(request => `${request.id}: () => new ${request.name}(),`));
+			code.push(...this.requests.map(request => `${request.responseId}: () => new ${request.responseName}(),`));
+			code.push('});');
 		}
 		return code;
 	}
 }
 
+// This class describes object field of array type [<type>].
+
+class ArrayField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+		this.field = Field.fromEntry(node, [tag, manifest[0]], true);
+	}
+
+	get type() {
+		return this.field.type + '[]';
+	}
+
+	estimator(name = '') {
+		return this.field.static
+			? `4 + this.${name}.length * ${this.field.size}`
+			: `4 + this.${name}.reduce((a, b) => a + ${this.field.estimator('b', true)}, 0)`;
+	}
+
+	packer(name = '') {
+		return [
+			`this.$packUint32(this.${name}.length);`,
+			`for (let i = 0; i < this.${name}.length; i++) {`,
+				`${this.field.packer(`${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
+			`}`
+		].join('\n');
+	}
+
+	unpacker() {
+		return [
+			`Array.from({ length: this.$unpackUint32() }, () => {`,
+				`return ${this.field.unpacker()}${!(this.field instanceof ArrayField) ? ';' : ''}`,
+			`})`
+		].join('\n');
+	}
+
+	get pack() {
+		let lines = [];
+		if (this.optional) lines.push(`if (${this.name} != null) {`);
+		lines.push(...this.packer(this.name).split('\n'));
+		if (this.optional) lines.push('}');
+		return lines;
+	}
+
+	get unpack() {
+		let lines = [];
+		if (this.optional) lines.push('if (this.$getFlag()) {');
+		lines.push(...`this.${this.name} = ${this.unpacker(this.name)}`.split('\n'));
+		if (this.optional) lines.push('}');
+		return lines;
+	}
+}
+
+// This class describes object field of type binary.
+
+class BinaryField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+		this.bytes = parseInt(manifest.substring(6));
+		node.container.importTypedData = true;
+	}
+
+	get type() {
+		return 'Uint8Array';
+	}
+
+	get size() {
+		return this.bytes;
+	}
+
+	packer(name = '') {
+		return `this.$packBinary(this.${name}, ${this.bytes})`;
+	}
+
+	unpacker() {
+		return `this.$unpackBinary(${this.bytes})`;
+	}
+}
+
+// This class describes object field of type bool.
+
+class BoolField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+	}
+
+	get type() {
+		return 'boolean';
+	}
+
+	get size() {
+		return 1;
+	}
+
+	packer(name = '') {
+		return `this.$packBool(this.${name})`;
+	}
+
+	unpacker() {
+		return `this.$unpackBool()`;
+	}
+}
+
+// This class describes object field of type datetime.
+
+class DateTimeField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+	}
+
+	get type() {
+		return 'Date';
+	}
+
+	get size() {
+		return 8;
+	}
+
+	packer(name = '') {
+		return `this.$packDateTime(this.${name})`;
+	}
+
+	unpacker() {
+		return `this.$unpackDateTime()`;
+	}
+}
+
+// This class describes object field of type float/double.
+
+class FloatField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+		this.bytes = manifest === 'float' ? 4 : 8;
+	}
+
+	get type() {
+		return 'number';
+	}
+
+	get size() {
+		return this.bytes;
+	}
+
+	packer(name = '') {
+		return this.bytes === 8 ? `this.$packDouble(this.${name})` : `this.$packFloat(this.${name})`;
+	}
+
+	unpacker() {
+		return this.bytes === 8 ? `this.$unpackDouble()` : `this.$unpackFloat()`;
+	}
+}
+
+// This class describes object field of type int8/uint8/int16/uint16/int32/uint32/int64/uint64.
+
+class IntField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+		this.signed = manifest[0] !== 'u';
+		this.bytes = Math.round(parseInt(manifest.replace(/\D/g, '')) / 8);
+	}
+
+	get type() {
+		return 'number';
+	}
+
+	get size() {
+		return this.bytes;
+	}
+
+	packer(name = '') {
+		return `this.$pack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}(this.${name})`;
+	}
+
+	unpacker() {
+		return `this.$unpack${this.signed ? 'Int' : 'Uint'}${this.bytes * 8}()`;
+	}
+}
+
+// This class describes object field of object type { ... }.
+
+class ObjectField extends Field {
+	constructor(node, tag, manifest, parentIsArray = false) {
+		super(node, tag, manifest);
+		this.embeddedObject = new Obj(node.container, `${node.tag}_${parentIsArray ? toSingular(tag) : tag}`, manifest);
+		node.embed(this.embeddedObject);
+	}
+
+	get type() {
+		return this.embeddedObject.name;
+	}
+
+	estimator(name = '', local = false) {
+		return `${local ? '' : 'this.'}${name}.$estimate()`;
+	}
+
+	packer(name = '') {
+		return `this.$packMessage(this.${name})`;
+	}
+
+	unpacker() {
+		return `this.$unpackMessage(new ${this.embeddedObject.name}())`;
+	}
+
+	output() {
+		return this.embeddedObject.output();
+	}
+}
+
+// This class describes object field of reference type @[filename:]<node>.
+
+class ReferenceField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+		let colonIndex = manifest.indexOf(':');
+		this.filename = colonIndex > 1 ? manifest.substring(1, colonIndex) : node.container.filename;
+		this.external = colonIndex > 1 && manifest.substring(1, colonIndex) !== node.container.filename;
+		this.referenceTag = colonIndex > 1 ? manifest.substring(colonIndex + 1) : manifest.substring(1);
+		if (this.referenceTag === '') {
+			throw `Field "${tag}" of node "${node.tag}" in ${node.container.filename}.json has reference filename "${this.filename}.json" but no reference node.`;
+		}
+		if (this.filename !== node.container.filename) node.include(this.filename, this.referenceTag);
+	}
+
+	get referenceNode() {
+		let container = this.node.container.containers[this.filename];
+		if (container == null) {
+			throw `Field "${this.tag}" of node "${this.node.tag}" in ${this.node.container.filename}.json refers to file "${this.filename}.json" which is not found within the current compilation process.`;
+		}
+		let ref = container.nodes.find(n => (n instanceof Enum || n instanceof Obj) && n.tag === this.referenceTag);
+		if (ref == null) {
+			throw `Field "${this.tag}" of node "${this.node.tag}" in ${this.node.container.filename}.json refers to node "${this.referenceTag}" in ${this.filename}.json, but such enum/object node does not exist.`;
+		}
+		return ref;
+	}
+
+	get type() {
+		return this.referenceNode.name;
+	}
+
+	get size() {
+		return this.static ? 1 : 0;
+	}
+
+	get static() {
+		return !this.optional && this.referenceNode instanceof Enum;
+	}
+
+	estimator(name = '', local = false) {
+		return this.referenceNode instanceof Enum
+			? '1'
+			: `${local ? '' : 'this.'}${name}.$estimate()`;
+	}
+
+	packer(name = '') {
+		return this.referenceNode instanceof Enum
+			? `this.$packUint8(this.${name})`
+			: `this.$packMessage(this.${name})`;
+	}
+
+	unpacker(name = '') {
+		let ref = this.referenceNode;
+		return ref instanceof Enum
+			? `this.$unpackUint8()`
+			: ref instanceof Obj && (ref.inheritTag !== '' || ref._getChildObjects().length > 0)
+				? `this.$unpackMessage(${ref._getInheritedRoot().name}.$emptyKin(this.$unpackUint32()))`
+				: `this.$unpackMessage(new ${ref.name}())`;
+	}
+}
+
+// This class describes object field of type string.
+
+class StringField extends Field {
+	constructor(node, tag, manifest) {
+		super(node, tag, manifest);
+	}
+
+	get type() {
+		return 'string';
+	}
+
+	estimator(name = '', local = false) {
+		return `this.$stringBytes(${local ? '' : 'this.'}${name})`;
+	}
+
+	packer(name = '') {
+		return `this.$packString(this.${name})`;
+	}
+
+	unpacker() {
+		return `this.$unpackString()`;
+	}
+}
+
 /// This file allows you to generate JS source code files for PackMe data protocol using JSON manifest files.
+
+nodes.Enum = Enum;
+nodes.Message = Message;
+nodes.Obj = Obj;
+nodes.Request = Request;
+fields.ArrayField = ArrayField;
+fields.BinaryField = BinaryField;
+fields.BoolField = BoolField;
+fields.DateTimeField = DateTimeField;
+fields.FloatField = FloatField;
+fields.IntField = IntField;
+fields.ObjectField = ObjectField;
+fields.ReferenceField = ReferenceField;
+fields.StringField = StringField;
 
 function processFiles(srcPath, outPath, filenames, isTest) {
 	let files;
@@ -879,6 +916,23 @@ function processFiles(srcPath, outPath, filenames, isTest) {
 		// Create container with nodes from the parsed data
 		containers[filename] = new Container(filename, manifest, containers);
 	}
+
+	let codePerFile = {};
+
+	// Process nodes and get resulting code strings
+	for (let container of Object.values(containers)) {
+		codePerFile[container.filename] ??= [];
+		codePerFile[container.filename].push(...container.output(containers));
+	}
+
+	// Output resulting code
+	for (let filename in codePerFile) {
+		let code = formatCode(codePerFile[filename]).join('\n');
+		if (!isTest) fs.writeFileSync(`${outPath}/${filename}.generated.js`, code, 'utf8');
+		else console.log(`${filename}.generated.js: ~${code.length} bytes`);
+	}
+
+	console.log(`${GREEN}${files.length} file${files.length > 1 ? 's are' : ' is'} successfully processed${RESET}`);
 }
 
 let args = process.argv.slice(2);

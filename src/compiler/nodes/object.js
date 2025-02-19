@@ -96,31 +96,30 @@ export default class Obj extends Node {
 
 		return [
             '',
-			`class ${this.name} extends ${this.inheritTag === '' ? 'PackMeMessage' : inheritedObject.name} {`,
+			`export class ${this.name} extends ${this.inheritTag === '' ? 'PackMeMessage' : inheritedObject.name} {`,
 			...this.fields.map(f => f.declaration),
 			'',
-			...(this.fields.length > 0 ? ['/**', ...this.fields.map(f => f.comment), ' */'] : []),
+			...(this.inheritTag === '' && Object.keys(childObjects).length > 0 ? [
+				`static $kinIds = new Map([`,
+					`	[${this.name}, 0],`,
+					...Object.entries(childObjects).map(([key, value]) => `	[${value.name}, ${key}],`),
+				']);',
+				'',
+				`static $emptyKin(id) {`,
+					'switch (id) {',
+						...Object.entries(childObjects).map(([key, value]) => `case ${key}: return new ${value.name}();`),
+						`default: return new ${this.name}();`,
+					'}',
+				'}',
+				''
+			] : []),
+			...(inheritedFields.length + this.fields.length > 0 ? ['/**', ...[...inheritedFields, ...this.fields].map(f => f.comment), ' */'] : []),
 			`constructor (${[...inheritedFields, ...this.fields].map(f => f.name).join(', ')}) {`,
 				'if (arguments.length === 0) return super();',
 				...(this.inheritTag !== '' ? [`super(${inheritedFields.map(f => f.name).join(', ')});`] : ['super();']),
 				...this.fields.map(f => f.initializer),
 			'}',
 			'',
-
-            // if (inheritTag.isEmpty && childObjects.isNotEmpty) ...<String>[
-            //     r'static Map<Type, int> $kinIds = <Type, int>{',
-            //         '$name: 0,',
-            //         ...childObjects.entries.map((MapEntry<int, Object> row) => '${row.value.name}: ${row.key},'),
-            //     '};\n',
-            //     'static $name \$emptyKin(int id) {',
-            //         'switch (id) {',
-            //             ...childObjects.entries.map((MapEntry<int, Object> row) => 'case ${row.key}: return ${row.value.name}.\$empty();'),
-            //             'default: return $name.\$empty();',
-            //         '}',
-            //     '}\n'
-            // ],
-            // ...fields.map((Field field) => field.declaration),
-
             ...(this.response != null ? [
 				'/**',
 				...this.response.fields.map(f => f.comment),
@@ -157,17 +156,17 @@ export default class Obj extends Node {
                 ...(this.id != null ? [`this.$initPack(${this.id});`] : []),
                 ...(this.inheritTag !== '' ? [
 					'super.$pack();'
-				] : childObjects.length > 0 ? [
-					'this.$packUint32($kinIds[runtimeType] ?? 0);'
+				] : Object.keys(childObjects).length > 0 ? [
+					`this.$packUint32(${this._getInheritedRoot().name}.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
 				] : []),
-                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
+                ...(this._flagBytes > 0 ? [`for (let i = 0; i < ${this._flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.pack), []),
             '}',
 			'',
             '$unpack() {',
                 ...(this.id != null ? ['this.$initUnpack();'] : []), // command ID
 				...(this.inheritTag !== '' ? ['super.$unpack();'] : []),
-                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$flags.push(this.$unpackUint8());`] : []),
+                ...(this._flagBytes > 0 ? [`for (let i = 0; i < ${this._flagBytes}; i++) this.$flags.push(this.$unpackUint8());`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.unpack), []),
             '}',
 			'',

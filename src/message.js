@@ -66,14 +66,14 @@ class PackMeMessage {
 		return result;
 	}
 
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$setBool(/** boolean */ on) {
 		let index = Math.floor(this.#boolsBitNumber / 8);
 		if (index >= this.$flags.length) this.$flags.push(0);
 		if (on) this.$flags[index] |= 1 << (this.#boolsBitNumber % 8);
 		this.#boolsBitNumber++;
 	}
-	/** @return {boolean} */
+	/** @returns {boolean} */
 	$getBool() {
 		let index = Math.floor(this.#boolsBitNumber / 8);
 		let result = ((this.$flags[index] >>> (this.#boolsBitNumber % 8)) & 1) === 1;
@@ -81,13 +81,13 @@ class PackMeMessage {
 		return result;
 	}
 
-	/** @return {number} */
+	/** @returns {number} */
 	$stringBytes(/** string */ value) {
 		let bytes = _utf8Encoder.encode(value);
 		return 4 + bytes.length;
 	}
 
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packMessage(/** PackMeMessage */ message) {
 		message.$data = this.$data;
 		message.$view = this.$view;
@@ -95,7 +95,7 @@ class PackMeMessage {
 		message.$pack();
 		this.#offset = message.#offset;
 	}
-	/** @return {PackMeMessage} */
+	/** @returns {PackMeMessage} */
 	$unpackMessage(/** PackMeMessage */ message) {
 		message.$data = this.$data;
 		message.$view = this.$view;
@@ -105,74 +105,74 @@ class PackMeMessage {
 		return message;
 	}
 
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packBinary(/** Uint8Array */ value, /** number */ length) {
 		for (let i = 0; i < length; i++) {
 			this.$view.setUint8(this.#offset++, value[i] || 0);
 		}
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packBool(/** boolean */ value) {
 		this.$view.setUint8(this.#offset, value ? 1 : 0);
 		this.#offset++;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packInt8(/** number */ value) {
 		this.$view.setInt8(this.#offset, value);
 		this.#offset++;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packInt16(/** number */ value) {
 		this.$view.setInt16(this.#offset, value, false);
 		this.#offset += 2;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packInt32(/** number */ value) {
 		this.$view.setInt32(this.#offset, value, false);
 		this.#offset += 4;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packInt64(/** bigint */ value) {
 		this.$view.setBigInt64(this.#offset, value, false);
 		this.#offset += 8;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packUint8(/** number */ value) {
 		this.$view.setUint8(this.#offset, value);
 		this.#offset++;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packUint16(/** number */ value) {
 		this.$view.setUint16(this.#offset, value, false);
 		this.#offset += 2;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packUint32(/** number */ value) {
 		this.$view.setUint32(this.#offset, value, false);
 		this.#offset += 4;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packUint64(/** bigint */ value) {
 		if (typeof value == 'number') value = BigInt(value);
 		this.$view.setBigUint64(this.#offset, value, false);
 		this.#offset += 8;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packFloat(/** number */ value) {
 		this.$view.setFloat32(this.#offset, value, false);
 		this.#offset += 4;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packDouble(/** number */ value) {
 		this.$view.setFloat64(this.#offset, value, false);
 		this.#offset += 8;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packDateTime(/** Date */ value) {
 		this.$view.setBigInt64(this.#offset, BigInt(value.getTime()), false);
 		this.#offset += 8;
 	}
-	/** @return {undefined} */
+	/** @returns {undefined} */
 	$packString(/** string */ value) {
 		let bytes = _utf8Encoder.encode(value);
 		this.$view.setUint32(this.#offset, bytes.length, false);
@@ -182,85 +182,85 @@ class PackMeMessage {
 		}
 	}
 
-	/** @return {Uint8Array} */
+	/** @returns {Uint8Array} */
 	$unpackBinary(/** number */ length) {
 		let value = new Uint8Array(length);
 		for (let i = 0; i < length; i++) value[i] = this.$view.getUint8(this.#offset++);
 		return value;
 	}
-	/** @return {boolean} */
+	/** @returns {boolean} */
 	$unpackBool() {
 		let value = this.$view.getUint8(this.#offset);
 		this.#offset++;
 		return value === 1;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackInt8() {
 		let value = this.$view.getInt8(this.#offset);
 		this.#offset++;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackInt16() {
 		let value = this.$view.getInt16(this.#offset, false);
 		this.#offset += 2;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackInt32() {
 		let value = this.$view.getInt32(this.#offset, false);
 		this.#offset += 4;
 		return value;
 	}
-	/** @return {bigint} */
+	/** @returns {bigint} */
 	$unpackInt64() {
 		let value = this.$view.getBigInt64(this.#offset, false);
 		this.#offset += 8;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackUint8() {
 		let value = this.$view.getUint8(this.#offset);
 		this.#offset++;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackUint16() {
 		let value = this.$view.getUint16(this.#offset, false);
 		this.#offset += 2;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackUint32() {
 		let value = this.$view.getUint32(this.#offset, false);
 		this.#offset += 4;
 		return value;
 	}
-	/** @return {bigint} */
+	/** @returns {bigint} */
 	$unpackUint64() {
 		let value = this.$view.getBigUint64(this.#offset, false);
 		this.#offset += 8;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackFloat() {
 		let value = this.$view.getFloat32(this.#offset, false);
 		this.#offset += 4;
 		return value;
 	}
-	/** @return {number} */
+	/** @returns {number} */
 	$unpackDouble() {
 		let value = this.$view.getFloat64(this.#offset, false);
 		this.#offset += 8;
 		return value;
 	}
-	/** @return {Date} */
+	/** @returns {Date} */
 	$unpackDateTime() {
 		let value = this.$view.getBigInt64(this.#offset, false);
 		this.#offset += 8;
 		return new Date(Number(value));
 	}
-	/** @return {string} */
+	/** @returns {string} */
 	$unpackString() {
 		let length = this.$view.getUint32(this.#offset, false);
 		this.#offset += 4;

@@ -11,8 +11,8 @@ export default class StringField extends Field {
 		return 'string';
 	}
 
-	estimator(name = '') {
-		return `this.$stringBytes(this.${name})`;
+	estimator(name = '', local = false) {
+		return `this.$stringBytes(${local ? '' : 'this.'}${name})`;
 	}
 
 	packer(name = '') {

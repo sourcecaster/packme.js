@@ -15,8 +15,8 @@ export default class ObjectField extends Field {
 		return this.embeddedObject.name;
 	}
 
-	estimator(name = '') {
-		return `this.${name}.$estimate()`;
+	estimator(name = '', local = false) {
+		return `${local ? '' : 'this.'}${name}.$estimate()`;
 	}
 
 	packer(name = '') {
@@ -24,7 +24,7 @@ export default class ObjectField extends Field {
 	}
 
 	unpacker() {
-		return `this.$unpackMessage(${this.embeddedObject.name}.$empty())`;
+		return `this.$unpackMessage(new ${this.embeddedObject.name}())`;
 	}
 
 	output() {
