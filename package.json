@@ -1,5 +1,5 @@
 {
-	"name": "packme",
+	"name": "packme-js",
 	"version": "2.0.0",
 	"description": "Blazing fast binary serialization via auto-generated classes from simple JSON manifest files.",
 	"type": "module",
