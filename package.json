@@ -4,6 +4,11 @@
 	"description": "Blazing fast binary serialization via auto-generated classes from simple JSON manifest files.",
 	"type": "module",
 	"module": "dist/packme.min.js",
+	"exports": {
+		".": {
+			"import": "./dist/packme.min.js"
+		}
+	},
 	"bin": {
 		"packme": "bin/compile.js"
 	},
@@ -11,7 +16,8 @@
 		"build": "rollup -c",
 		"dev": "rollup -c -w",
 		"example": "node example/example.mjs",
-		"compile": "node bin/compile.js example example/generated"
+		"compile": "node bin/compile.js example example/generated",
+		"test": "vitest"
 	},
 	"keywords": [
 		"binary",
@@ -38,7 +44,7 @@
 	"license": "MIT",
 	"devDependencies": {
 		"rollup": "^2.55.1",
-		"rollup-plugin-terser": "^7.0.2"
-	},
-	"dependencies": {}
+		"rollup-plugin-terser": "^7.0.2",
+		"vitest": "^3.0.6"
+	}
 }

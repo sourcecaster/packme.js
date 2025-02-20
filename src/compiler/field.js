@@ -49,12 +49,12 @@ export default class Field {
 
 	/// Returns code of class field declaration.
 	get declaration() {
-		return `/** @type {${this.type}} */ ${this.name};`;
+		return `/** @type {${this.optional ? '?' : '!'}${this.type}} */ ${this.name};`;
 	}
 
 	// Get comment @param string
 	get comment() {
-		return ` * @param {${this.type}} ${this.optional ? `[${this.name}]` : this.name}`;
+		return ` * @param {${this.optional ? '?' : '!'}${this.type}} ${this.optional ? `[${this.name}]` : this.name}`;
 	}
 
 	// Get initialization code

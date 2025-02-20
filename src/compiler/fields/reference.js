@@ -57,7 +57,7 @@ export default class ReferenceField extends Field {
 		let ref = this.referenceNode;
 		return ref instanceof Enum
 			? `this.$unpackUint8()`
-			: ref instanceof Obj && (ref.inheritTag !== '' || ref._getChildObjects().length > 0)
+			: ref instanceof Obj && (ref.inheritTag !== '' || Object.keys(ref._getChildObjects()).length > 0)
 				? `this.$unpackMessage(${ref._getInheritedRoot().name}.$emptyKin(this.$unpackUint32()))`
 				: `this.$unpackMessage(new ${ref.name}())`;
 	}

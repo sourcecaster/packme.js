@@ -92,7 +92,7 @@ export default class Obj extends Node {
 		let childObjects = this._getChildObjects();
 
 		// Add 4 bytes for specific inherited object class ID (to be able to unpack corresponding inherited object)
-		if (this.inheritTag !== '' || Object.keys(childObjects).length > 0) this._minBufferSize += 4;
+		if (this.inheritTag === '' && Object.keys(childObjects).length > 0) this._minBufferSize += 4;
 
 		return [
             '',
@@ -100,7 +100,7 @@ export default class Obj extends Node {
 			...this.fields.map(f => f.declaration),
 			'',
 			...(this.inheritTag === '' && Object.keys(childObjects).length > 0 ? [
-				`static $kinIds = new Map([`,
+				`$kinIds = new Map([`,
 					`	[${this.name}, 0],`,
 					...Object.entries(childObjects).map(([key, value]) => `	[${value.name}, ${key}],`),
 				']);',
@@ -157,7 +157,7 @@ export default class Obj extends Node {
                 ...(this.inheritTag !== '' ? [
 					'super.$pack();'
 				] : Object.keys(childObjects).length > 0 ? [
-					`this.$packUint32(${this._getInheritedRoot().name}.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
+					`this.$packUint32(this.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
 				] : []),
                 ...(this._flagBytes > 0 ? [`for (let i = 0; i < ${this._flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.pack), []),

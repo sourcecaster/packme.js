@@ -1,5 +1,5 @@
-import {PackMe, PackMeMessage} from "../dist/packme.min.js";
-import {TestMessage, NestedObject, TypeEnum, exampleMessageFactory} from "./generated/example.generated.js";
+import { PackMe, PackMeMessage } from '../dist/packme.min.js';
+import { TestMessage, NestedObject, TypeEnum, exampleMessageFactory } from './generated/example.generated.js';
 
 console.log('ok');
 let pm = new PackMe(console.error);

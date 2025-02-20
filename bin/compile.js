@@ -207,6 +207,9 @@ class Enum extends Node {
 	output() {
 		return [
 			'',
+			'/**',
+			' * @enum {number}',
+			' */',
 			`export const ${this.name} = Object.freeze({`,
 			...this.values.map((v, i) => `${v}: ${i},`),
 			'})'
@@ -263,12 +266,12 @@ class Field {
 
 	/// Returns code of class field declaration.
 	get declaration() {
-		return `/** @type {${this.type}} */ ${this.name};`;
+		return `/** @type {${this.optional ? '?' : '!'}${this.type}} */ ${this.name};`;
 	}
 
 	// Get comment @param string
 	get comment() {
-		return ` * @param {${this.type}} ${this.optional ? `[${this.name}]` : this.name}`;
+		return ` * @param {${this.optional ? '?' : '!'}${this.type}} ${this.optional ? `[${this.name}]` : this.name}`;
 	}
 
 	// Get initialization code
@@ -387,7 +390,7 @@ class Obj extends Node {
 		let childObjects = this._getChildObjects();
 
 		// Add 4 bytes for specific inherited object class ID (to be able to unpack corresponding inherited object)
-		if (this.inheritTag !== '' || Object.keys(childObjects).length > 0) this._minBufferSize += 4;
+		if (this.inheritTag === '' && Object.keys(childObjects).length > 0) this._minBufferSize += 4;
 
 		return [
             '',
@@ -395,7 +398,7 @@ class Obj extends Node {
 			...this.fields.map(f => f.declaration),
 			'',
 			...(this.inheritTag === '' && Object.keys(childObjects).length > 0 ? [
-				`static $kinIds = new Map([`,
+				`$kinIds = new Map([`,
 					`	[${this.name}, 0],`,
 					...Object.entries(childObjects).map(([key, value]) => `	[${value.name}, ${key}],`),
 				']);',
@@ -452,16 +455,16 @@ class Obj extends Node {
                 ...(this.inheritTag !== '' ? [
 					'super.$pack();'
 				] : Object.keys(childObjects).length > 0 ? [
-					`this.$packUint32(${this._getInheritedRoot().name}.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
+					`this.$packUint32(this.$kinIds.get(Object.getPrototypeOf(this).constructor) ?? 0);`
 				] : []),
-                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
+                ...(this._flagBytes > 0 ? [`for (let i = 0; i < ${this._flagBytes}; i++) this.$packUint8(this.$flags[i]);`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.pack), []),
             '}',
 			'',
             '$unpack() {',
                 ...(this.id != null ? ['this.$initUnpack();'] : []), // command ID
 				...(this.inheritTag !== '' ? ['super.$unpack();'] : []),
-                ...(this.flagBytes > 0 ? [`for (let i = 0; i < ${this.flagBytes}; i++) this.$flags.push(this.$unpackUint8());`] : []),
+                ...(this._flagBytes > 0 ? [`for (let i = 0; i < ${this._flagBytes}; i++) this.$flags.push(this.$unpackUint8());`] : []),
                 ...this.fields.reduce((a, b) => a.concat(b.unpack), []),
             '}',
 			'',
@@ -574,17 +577,18 @@ class ArrayField extends Field {
 		return this.field.type + '[]';
 	}
 
-	estimator(name = '') {
+	estimator(name = '', local = false) {
 		return this.field.static
-			? `4 + this.${name}.length * ${this.field.size}`
-			: `4 + this.${name}.reduce((a, b) => a + ${this.field.estimator('b', true)}, 0)`;
+			? `4 + ${local ? '' : 'this.'}${name}.length * ${this.field.size}`
+			: `4 + ${local ? '' : 'this.'}${name}.reduce((a, b) => a + ${this.field.estimator('b', true)}, 0)`;
 	}
 
 	packer(name = '') {
+		let i = `i${name.length}`;
 		return [
 			`this.$packUint32(this.${name}.length);`,
-			`for (let i = 0; i < this.${name}.length; i++) {`,
-				`${this.field.packer(`${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
+			`for (let ${i} = 0; ${i} < this.${name}.length; ${i}++) {`,
+				`${this.field.packer(`${name}[${i}]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
 			`}`
 		].join('\n');
 	}
@@ -599,7 +603,7 @@ class ArrayField extends Field {
 
 	get pack() {
 		let lines = [];
-		if (this.optional) lines.push(`if (${this.name} != null) {`);
+		if (this.optional) lines.push(`if (this.${this.name} != null) {`);
 		lines.push(...this.packer(this.name).split('\n'));
 		if (this.optional) lines.push('}');
 		return lines;
@@ -723,7 +727,7 @@ class IntField extends Field {
 	}
 
 	get type() {
-		return 'number';
+		return this.bytes === 8 ? 'BigInt' : 'number';
 	}
 
 	get size() {
@@ -824,7 +828,7 @@ class ReferenceField extends Field {
 		let ref = this.referenceNode;
 		return ref instanceof Enum
 			? `this.$unpackUint8()`
-			: ref instanceof Obj && (ref.inheritTag !== '' || ref._getChildObjects().length > 0)
+			: ref instanceof Obj && (ref.inheritTag !== '' || Object.keys(ref._getChildObjects()).length > 0)
 				? `this.$unpackMessage(${ref._getInheritedRoot().name}.$emptyKin(this.$unpackUint32()))`
 				: `this.$unpackMessage(new ${ref.name}())`;
 	}
@@ -935,23 +939,28 @@ function processFiles(srcPath, outPath, filenames, isTest) {
 	console.log(`${GREEN}${files.length} file${files.length > 1 ? 's are' : ' is'} successfully processed${RESET}`);
 }
 
-let args = process.argv.slice(2);
-let isTest = args[0] === '--test';
-if (isTest) args.shift();
-let srcPath = path.resolve(args[0] ?? '');
-let outPath = path.resolve(args[1] ?? '');
-let filenames = args.slice(2);
+function main(args) {
+	let isTest = args[0] === '--test';
+	if (isTest) args.shift();
+	let srcPath = path.resolve(args[0] ?? '');
+	let outPath = path.resolve(args[1] ?? '');
+	let filenames = args.slice(2);
 
-// Remove duplicates and add file extension if not specified
-filenames = [...new Set(filenames.map(f => f.endsWith('.json') ? f : f + '.json'))];
+	// Remove duplicates and add file extension if not specified
+	filenames = [...new Set(filenames.map(f => f.endsWith('.json') ? f : f + '.json'))];
 
-try {
-	console.log(`${GREEN}Compiling ${filenames.length === 0 ? 'all .json files...' : `${filenames.length} files: ${filenames.join(', ')}...`}${RESET}`);
-	console.log(`${GREEN}    Input directory: ${YELLOW}${srcPath}${RESET}`);
-	console.log(`${GREEN}    Output directory: ${YELLOW}${outPath}${RESET}`);
-	processFiles(srcPath, outPath, filenames, isTest);
+	try {
+		console.log(`${GREEN}Compiling ${filenames.length === 0 ? 'all .json files...' : `${filenames.length} files: ${filenames.join(', ')}...`}${RESET}`);
+		console.log(`${GREEN}    Input directory: ${YELLOW}${srcPath}${RESET}`);
+		console.log(`${GREEN}    Output directory: ${YELLOW}${outPath}${RESET}`);
+		processFiles(srcPath, outPath, filenames, isTest);
+	}
+	catch (err) {
+		if (isTest) throw err;
+		else console.log(`${RED}${err}${RESET}`);
+	}
 }
-catch (err) {
-	if (isTest) throw err;
-	else console.log(`${RED}${err}${RESET}`);
-}
+
+if (process.argv[2] !== '--test') main(process.argv.slice(2));
+
+export { main as default };

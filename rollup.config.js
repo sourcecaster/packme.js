@@ -6,7 +6,7 @@ export default [
 	{
 		input: 'src/index.js',
 		output: {
-			file: production ? 'dist/packme.min.js' : 'dist/packme.js',
+			file: 'dist/packme.min.js',
 			format: 'es',
 			sourcemap: !production
 		},

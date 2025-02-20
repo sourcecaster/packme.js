@@ -10,7 +10,7 @@ export default class IntField extends Field {
 	}
 
 	get type() {
-		return 'number';
+		return this.bytes === 8 ? 'BigInt' : 'number';
 	}
 
 	get size() {

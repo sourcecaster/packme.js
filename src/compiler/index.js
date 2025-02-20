@@ -180,23 +180,27 @@ function processFiles(srcPath, outPath, filenames, isTest) {
 	console.log(`${GREEN}${files.length} file${files.length > 1 ? 's are' : ' is'} successfully processed${RESET}`);
 }
 
-let args = process.argv.slice(2);
-let isTest = args[0] === '--test';
-if (isTest) args.shift();
-let srcPath = path.resolve(args[0] ?? '');
-let outPath = path.resolve(args[1] ?? '');
-let filenames = args.slice(2);
+function main(args) {
+	let isTest = args[0] === '--test';
+	if (isTest) args.shift();
+	let srcPath = path.resolve(args[0] ?? '');
+	let outPath = path.resolve(args[1] ?? '');
+	let filenames = args.slice(2);
 
-// Remove duplicates and add file extension if not specified
-filenames = [...new Set(filenames.map(f => f.endsWith('.json') ? f : f + '.json'))];
+	// Remove duplicates and add file extension if not specified
+	filenames = [...new Set(filenames.map(f => f.endsWith('.json') ? f : f + '.json'))];
 
-try {
-	console.log(`${GREEN}Compiling ${filenames.length === 0 ? 'all .json files...' : `${filenames.length} files: ${filenames.join(', ')}...`}${RESET}`);
-	console.log(`${GREEN}    Input directory: ${YELLOW}${srcPath}${RESET}`);
-	console.log(`${GREEN}    Output directory: ${YELLOW}${outPath}${RESET}`);
-	processFiles(srcPath, outPath, filenames, isTest);
+	try {
+		console.log(`${GREEN}Compiling ${filenames.length === 0 ? 'all .json files...' : `${filenames.length} files: ${filenames.join(', ')}...`}${RESET}`);
+		console.log(`${GREEN}    Input directory: ${YELLOW}${srcPath}${RESET}`);
+		console.log(`${GREEN}    Output directory: ${YELLOW}${outPath}${RESET}`);
+		processFiles(srcPath, outPath, filenames, isTest);
+	}
+	catch (err) {
+		if (isTest) throw err;
+		else console.log(`${RED}${err}${RESET}`);
+	}
 }
-catch (err) {
-	if (isTest) throw err;
-	else console.log(`${RED}${err}${RESET}`);
-}
+
+if (process.argv[2] !== '--test') main(process.argv.slice(2));
+export default main;

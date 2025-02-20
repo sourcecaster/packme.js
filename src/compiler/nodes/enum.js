@@ -24,6 +24,9 @@ export default class Enum extends Node {
 	output() {
 		return [
 			'',
+			'/**',
+			' * @enum {number}',
+			' */',
 			`export const ${this.name} = Object.freeze({`,
 			...this.values.map((v, i) => `${v}: ${i},`),
 			'})'

@@ -12,17 +12,18 @@ export default class ArrayField extends Field {
 		return this.field.type + '[]';
 	}
 
-	estimator(name = '') {
+	estimator(name = '', local = false) {
 		return this.field.static
-			? `4 + this.${name}.length * ${this.field.size}`
-			: `4 + this.${name}.reduce((a, b) => a + ${this.field.estimator('b', true)}, 0)`;
+			? `4 + ${local ? '' : 'this.'}${name}.length * ${this.field.size}`
+			: `4 + ${local ? '' : 'this.'}${name}.reduce((a, b) => a + ${this.field.estimator('b', true)}, 0)`;
 	}
 
 	packer(name = '') {
+		let i = `i${name.length}`;
 		return [
 			`this.$packUint32(this.${name}.length);`,
-			`for (let i = 0; i < this.${name}.length; i++) {`,
-				`${this.field.packer(`${name}[i]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
+			`for (let ${i} = 0; ${i} < this.${name}.length; ${i}++) {`,
+				`${this.field.packer(`${name}[${i}]`)}${!(this.field instanceof ArrayField) ? ';' : ''}`,
 			`}`
 		].join('\n');
 	}
